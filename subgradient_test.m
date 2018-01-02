@@ -8,7 +8,6 @@ fclose(f);
 
 m = r_dimensions{1}(1);
 n = r_dimensions{1}(2);
-
 nvars = m*n;
 
 tmp = r_values{1};
@@ -17,13 +16,9 @@ a_vec = tmp(nvars+1:2*nvars);
 b = tmp(2*nvars+1:end);
 
 % compose a matrix from a vector
-a = zeros(m,n);
-j = 1;
-for i = 1:m
-    a( i,1:n ) = a_vec(j:j+n-1);
-    j = j + n;
-end
+a = reshape(a_vec, [n,m])';
 
+% define parameters used in sub_grad algorithm
 epsilon = 0.1;
 ro = 1;
 pi_zero = zeros(m*m,1);
@@ -31,7 +26,7 @@ iterLimit = 100;
 DualNoChangTOL = 2;
 
 [pi_k, theta_pi_k] = sub_grad( epsilon, ro, pi_zero, iterLimit, DualNoChangTOL,a,b,c);
-disp(pi_k, theta_pi_k)
+
 end
 
 
@@ -48,7 +43,6 @@ condition = true;
 
 while( condition )
     [x_k, theta_pi_k] = solve_lagrangien_relaxation(pi_k,a,b,c);
-
     gamma_k = g_10(x_k, a, b);
     
     if theta_pi_k > beta_k
@@ -63,11 +57,15 @@ while( condition )
     end
     
     if gamma_k == 0
-        condition = false;
+        break;
     else
-        %theta_chap = applymyHeuristic();
+        theta_chap = applymyHeuristic(x_k, a,b,c);
+        if (isempty(theta_chap))
+            break;
+        end
+        
         for j = 1:m*m
-            pi_k(j) = max(0, pi_k(j) - (ro * (theta_pi_k - theta_chap)/norm(gamma))*gamma(j) );
+            pi_k(j) = max(0, pi_k(j) - (theta_pi_k - theta_chap)/norm(gamma_k)*ro*gamma_k(j) );
         end
         k = k + 1;
         condition = abs(L_10(x_k,pi_k, a, b, c)-theta_pi_k) / theta_pi_k > epsilon || k<iterLimit;
@@ -151,7 +149,28 @@ X0 = zeros(x_length,1);
 
 end
 
+function theta_chap = applymyHeuristic(x_0,a,b,c)
+[m,n] = size(a);
 
+A = zeros(m, m*n);
+j = 1;
+for i=1:m
+    A(i, (j-1)*n+1:j*n ) = a(i,:);
+    j = j + 1;
+end
+
+Aeq = repmat( eye(n), 1, m);
+Beq = ones(n,1);
+
+LB = zeros(m*n, 1);
+UB = ones(m*n, 1);
+
+[~,theta_chap] = intlinprog(c, 1:m*n, A,b, Aeq, Beq, LB, UB, x_0(1:m*n));
+
+% f = @(x) sum(c .* x);
+% [~,theta_chap] = patternsearch(f, x_0(1:m*n), A,b, Aeq, Beq, LB, UB);
+
+end
 
 function L = L_10(x, pi, a, b, c)
 % define the Lagrangien relaxation with constraint (10)
