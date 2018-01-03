@@ -1,9 +1,9 @@
 function metaheuristics()
     % load data
-    f = fopen('data-1/1/a05100', 'r');
-    r_dimensions = textscan(f, '%f', 2);
-    r_values = textscan(f, '%f');
-    fclose(f);
+    inf = fopen('data-1/1/a20200', 'r');
+    r_dimensions = textscan(inf, '%f', 2);
+    r_values = textscan(inf, '%f');
+    fclose(inf);
 
     m = r_dimensions{1}(1);
     n = r_dimensions{1}(2);
@@ -14,23 +14,20 @@ function metaheuristics()
     A_vec = tmp(nvars+1:2*nvars);
     b = tmp(2*nvars+1:end);
 
-    % objective function
-    f = @(x) obj_func(m, n, x, c);
-
     % compose A matrix from A vector (for constraints (3))
     A = zeros(m, nvars);
     for i = 1:m
         for j = 1:n
-            A(i, (i-1)*m+j) = A_vec((i-1)*m+j);
+            A(i, (i-1)*n+j) = A_vec((i-1)*n+j);
         end
     end
 
     % compose Aeq matrix (for constraints (4) on column sum)
-    Aeq = zeros(m, nvars);
-    for i = 1:m
-        Aeq(:,(i-1)*m+1:(i-1)*m+m) = eye(m);
+    Aeq = zeros(n, nvars);
+    for i = 0:m-1
+        Aeq(:,i*n+1:i*n+n) = eye(n);
     end
-    beq = ones(m, 1);
+    beq = ones(n, 1);
 
     x0 = zeros(nvars, 1);
 
@@ -38,22 +35,14 @@ function metaheuristics()
     % -----------------
     run_problem(m, n, x0, c, A, b, Aeq, beq);
 
-    % ga with integer vars takes no equality constraints: workaround is to add
-    % two inequality constraints equivalent to the equality constraint:
-    %A2 = [A;Aeq;-Aeq];
-    %b2 = [b;beq;-beq];
-    %opts = optimoptions('ga','MaxStallGenerations',50,'FunctionTolerance',1e-10,'MaxGenerations',300);
-    %x_ga = ga(f, m*n, A2, b2, [], [], lb, ub, [], 1:nvars, opts);
-    %x_ga = ga(f, nvars, A, b, Aeq, beq, lb, ub);
-
     %%
     % solve (L) problem without constraints (10)
     % ------------------------------------------
     % load data
-    f = fopen('data-1/1/a05100', 'r');
-    r_dimensions = textscan(f, '%f', 2);
-    r_values = textscan(f, '%f');
-    fclose(f);
+    inf = fopen('data-1/1/a05100', 'r');
+    r_dimensions = textscan(inf, '%f', 2);
+    r_values = textscan(inf, '%f');
+    fclose(inf);
 
     m = r_dimensions{1}(1);
     n = r_dimensions{1}(2);
@@ -141,8 +130,8 @@ function metaheuristics()
     toc
 
     % display results
-    disp_x_ps = reshape(x_ps(1:m*n), m, n)';
-    disp_z_ps = reshape(x_ps(m*n+1:end), m*m, n)';
+    disp_x_ps = sol_display(m, n, x_ps(1:m*n));
+    disp_z_ps = sol_display(m*m, n, x_ps(m*n+1:end));
 
     disp('PATTERN SEARCH');
     disp('Solution x =')
@@ -151,7 +140,8 @@ function metaheuristics()
     disp(disp_z_ps);
     disp(['Objective value (min): ', num2str(obj_ps)]);
 
-    % resolve (P) problem
+    % re-solve (P) problem
+    % --------------------
     nvars = m*n;
 
     tmp = r_values{1};
@@ -159,31 +149,31 @@ function metaheuristics()
     A_vec = tmp(nvars+1:2*nvars);
     b = tmp(2*nvars+1:end);
 
-    % compose A matrix from A vector
+    % compose A matrix from A vector (for constraints (3))
     A = zeros(m, nvars);
     for i = 1:m
         for j = 1:n
-            A(i, (i-1)*m+j) = A_vec((i-1)*m+j);
+            A(i, (i-1)*n+j) = A_vec((i-1)*n+j);
         end
     end
 
-    % compose Aeq matrix (for constraint (4) on column sum)
-    Aeq = zeros(m, nvars);
-    for i = 1:m
-        Aeq(:,(i-1)*m+1:(i-1)*m+m) = eye(m);
+    % compose Aeq matrix (for constraints (4) on column sum)
+    Aeq = zeros(n, nvars);
+    for i = 0:m-1
+        Aeq(:,i*n+1:i*n+n) = eye(n);
     end
-    beq = ones(m, 1);
+    beq = ones(n, 1);
 
-    run_problem(m, n, x0, c, A, b, Aeq, beq);
+    run_problem(m, n, x_ps(1:m*n), c, A, b, Aeq, beq);
 
     %%
     % solve (L) problem without constraints (11)
     % ------------------------------------------
     % load data
-    f = fopen('data-1/1/a0303', 'r');
-    r_dimensions = textscan(f, '%f', 2);
-    r_values = textscan(f, '%f');
-    fclose(f);
+    inf = fopen('data-1/1/a05100', 'r');
+    r_dimensions = textscan(inf, '%f', 2);
+    r_values = textscan(inf, '%f');
+    fclose(inf);
 
     m = r_dimensions{1}(1);
     n = r_dimensions{1}(2);
@@ -281,8 +271,8 @@ function metaheuristics()
     toc
 
     % display results
-    disp_x_ps = reshape(x_ps(1:m*n), m, n)';
-    disp_z_ps = reshape(x_ps(m*n+1:end), m*m, n)';
+    disp_x_ps = sol_display(m, n, x_ps(1:m*n));
+    disp_z_ps = sol_display(m*m, n, x_ps(m*n+1:end));
 
     disp('PATTERN SEARCH');
     disp('Solution x =')
@@ -291,7 +281,8 @@ function metaheuristics()
     disp(disp_z_ps);
     disp(['Objective value (min): ', num2str(obj_ps)]);
 
-    % resolve (P) problem
+    % re-solve (P) problem
+    % --------------------
     nvars = m*n;
 
     tmp = r_values{1};
@@ -299,44 +290,35 @@ function metaheuristics()
     A_vec = tmp(nvars+1:2*nvars);
     b = tmp(2*nvars+1:end);
 
-    % compose A matrix from A vector
+    % compose A matrix from A vector (for constraints (3))
     A = zeros(m, nvars);
     for i = 1:m
         for j = 1:n
-            A(i, (i-1)*m+j) = A_vec((i-1)*m+j);
+            A(i, (i-1)*n+j) = A_vec((i-1)*n+j);
         end
     end
 
-    % compose Aeq matrix (for constraint (4) on column sum)
-    Aeq = zeros(m, nvars);
-    for i = 1:m
-        Aeq(:,(i-1)*m+1:(i-1)*m+m) = eye(m);
+    % compose Aeq matrix (for constraints (4) on column sum)
+    Aeq = zeros(n, nvars);
+    for i = 0:m-1
+        Aeq(:,i*n+1:i*n+n) = eye(n);
     end
-    beq = ones(m, 1);
+    beq = ones(n, 1);
 
     run_problem(m, n, x_ps(1:m*n), c, A, b, Aeq, beq);
-end
-
-function obj = obj_func(m, n, x, c)
-    obj = 0;
-    for i = 1:m
-        for j = 1:n
-            obj = obj + c((i-1)*m+j)*x((i-1)*m+j);
-        end
-    end
 end
 
 function run_problem(m, n, x0, c, A, b, Aeq, beq)
     % prepare vars
     nvars = length(x0);
-
     lb = zeros(nvars, 1);
     ub = ones(nvars, 1);
     f = @(x) obj_func(m, n, x, c);
 
-    % solve P problem with the 3 heuristics
+    % solve (P) problem with the 3 heuristics:
+    % ----------------------------------------
     % PATTERNSEARCH
-    opts = optimoptions('patternsearch', 'ScaleMesh', false, 'MeshTolerance', 1.0); % force integer solutions
+    opts = optimoptions('patternsearch', 'ScaleMesh', false, 'MeshTolerance', 0.99); % force integer solutions
     tic
     [x_ps, obj_ps] = patternsearch(f, x0, A, b, Aeq, beq, lb, ub, [], opts);
     toc
@@ -345,9 +327,10 @@ function run_problem(m, n, x0, c, A, b, Aeq, beq)
     % two inequality constraints equivalent to the equality constraint:
     A2 = [A;Aeq;-Aeq];
     b2 = [b;beq;-beq];
-    opts = optimoptions('ga','MaxStallGenerations',50,'FunctionTolerance',1e-10,'MaxGenerations',300);
+    opts = optimoptions('ga','MaxStallGenerations',50,'FunctionTolerance',1e-10,'MaxGenerations',300,'ConstraintTolerance',1e-10);
     tic
-    [x_ga, obj_ga] = ga(f, nvars, A2, b2, [], [], lb, ub, [], 1:nvars, opts);
+    [x_ga, obj_ga] = ga(f, nvars, A2, b2, [], [], lb, ub, [], 1:nvars);
+    %x_ga = 0; obj_ga = 0;
     toc
     
     % INTLINPROG
@@ -356,12 +339,13 @@ function run_problem(m, n, x0, c, A, b, Aeq, beq)
     toc
 
     % display results
-    disp_x_ps = reshape(x_ps, m, n)';
-    disp_x_ga = reshape(x_ga, m, n)';
-    disp_x_int = reshape(x_intlinprog, m, n)';
+    disp_x_ps = sol_display(m, n, x_ps);
+    disp_x_ga = sol_display(m, n, x_ga);
+    %disp_x_ga = x_ga;
+    disp_x_int = sol_display(m, n, x_intlinprog);
 
     disp('PATTERN SEARCH');
-    disp('Solution x =')
+    disp('Solution x =');
     disp(disp_x_ps);
     disp(['Objective value (min): ', num2str(obj_ps)]);
 
@@ -371,7 +355,23 @@ function run_problem(m, n, x0, c, A, b, Aeq, beq)
     disp(['Objective value (min): ', num2str(obj_ga)]);
 
     disp('INTLINPROG');
-    disp('Solution x =')
+    disp('Solution x =');
     disp(disp_x_int);
     disp(['Objective value (min): ', num2str(obj_intlinprog)]);
+end
+
+function obj = obj_func(m, n, x, c)
+    obj = 0;
+    for i = 1:m
+        for j = 1:n
+            obj = obj + c((i-1)*n+j)*x((i-1)*n+j);
+        end
+    end
+end
+
+function d = sol_display(m, n, x)
+    d = zeros(m,n);
+    for i = 1:m
+        d(i,:) = x((i-1)*n+1:(i-1)*n+n);
+    end
 end
