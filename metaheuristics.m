@@ -1,6 +1,6 @@
 function metaheuristics()
     % load data
-    f = fopen('data-1/1/a0303', 'r');
+    f = fopen('data-1/1/a05100', 'r');
     r_dimensions = textscan(f, '%f', 2);
     r_values = textscan(f, '%f');
     fclose(f);
@@ -180,7 +180,7 @@ function metaheuristics()
     % solve (L) problem without constraints (11)
     % ------------------------------------------
     % load data
-    f = fopen('data-1/1/a05100', 'r');
+    f = fopen('data-1/1/a0303', 'r');
     r_dimensions = textscan(f, '%f', 2);
     r_values = textscan(f, '%f');
     fclose(f);
@@ -314,7 +314,7 @@ function metaheuristics()
     end
     beq = ones(m, 1);
 
-    run_problem(m, n, x0, c, A, b, Aeq, beq);
+    run_problem(m, n, x_ps(1:m*n), c, A, b, Aeq, beq);
 end
 
 function obj = obj_func(m, n, x, c)
@@ -335,13 +335,22 @@ function run_problem(m, n, x0, c, A, b, Aeq, beq)
     f = @(x) obj_func(m, n, x, c);
 
     % solve P problem with the 3 heuristics
+    % PATTERNSEARCH
     opts = optimoptions('patternsearch', 'ScaleMesh', false, 'MeshTolerance', 1.0); % force integer solutions
     tic
     [x_ps, obj_ps] = patternsearch(f, x0, A, b, Aeq, beq, lb, ub, [], opts);
     toc
+    
+    % GA: ga with integer vars takes no equality constraints: workaround is to add
+    % two inequality constraints equivalent to the equality constraint:
+    A2 = [A;Aeq;-Aeq];
+    b2 = [b;beq;-beq];
+    opts = optimoptions('ga','MaxStallGenerations',50,'FunctionTolerance',1e-10,'MaxGenerations',300);
     tic
-    [x_ga, obj_ga] = ga(f, nvars, A, b, Aeq, beq, lb, ub);
+    [x_ga, obj_ga] = ga(f, nvars, A2, b2, [], [], lb, ub, [], 1:nvars, opts);
     toc
+    
+    % INTLINPROG
     tic
     [x_intlinprog, obj_intlinprog] = intlinprog(c, 1:nvars, A, b, Aeq, beq, lb, ub);
     toc
