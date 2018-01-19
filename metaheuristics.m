@@ -1,6 +1,6 @@
 function metaheuristics()
     % load data
-    inf = fopen('data-1/1/a20200', 'r');
+    inf = fopen('data-1/1/a10100', 'r');
     r_dimensions = textscan(inf, '%f', 2);
     r_values = textscan(inf, '%f');
     fclose(inf);
@@ -23,23 +23,20 @@ function metaheuristics()
     end
 
     % compose Aeq matrix (for constraints (4) on column sum)
-    Aeq = zeros(n, nvars);
-    for i = 0:m-1
-        Aeq(:,i*n+1:i*n+n) = eye(n);
-    end
+    Aeq = repmat(eye(n), 1, m);
     beq = ones(n, 1);
 
     x0 = zeros(nvars, 1);
 
     % solve (P) problem
     % -----------------
-    run_problem(m, n, x0, c, A, b, Aeq, beq);
+    run_problem(m, n, x0, c, A, b, Aeq, beq, A_vec);
 
     %%
     % solve (L) problem without constraints (10)
     % ------------------------------------------
     % load data
-    inf = fopen('data-1/1/a05100', 'r');
+    inf = fopen('data-1/1/a0505', 'r');
     r_dimensions = textscan(inf, '%f', 2);
     r_values = textscan(inf, '%f');
     fclose(inf);
@@ -66,6 +63,7 @@ function metaheuristics()
     row = 1;
     for i = 1:m
         for k = 1:m
+            disp([num2str(i), ', ', num2str(k), ' // ', num2str(row), ' // ', num2str((i-1)*m+k)]);
             A(row, row) = -(b(i) - A_vec((i-1)*m+k));
             for j = 1:n
                 A(row, m*m + (i-1)*m*m + k + (j-1)*m) = A_vec((i-1)*m + j);
@@ -112,11 +110,9 @@ function metaheuristics()
     B = [zeros(size(A,1) - m*m*n,1);ones(m*m*n,1)];
 
     % compose Aeq matrix (for constraint (4) on column sum)
-    Aeq = zeros(m, nvars);
-    for i = 1:m
-        Aeq(:,(i-1)*m+1:(i-1)*m+m) = eye(m);
-    end
-    beq = ones(m, 1);
+    Aeq = zeros(n, nvars);
+    Aeq(:,1:m*n) = repmat(eye(n), 1, m);
+    beq = ones(n, 1);
 
     x0 = zeros(nvars, 1);
 
@@ -124,9 +120,10 @@ function metaheuristics()
     ub = [ones(m*n, 1);Inf*ones(nvars - m*n, 1)];
 
     % solve problem
-    opts = optimoptions('patternsearch','TolBind',0.2);
+    opts = optimoptions('patternsearch', 'PollMethod', 'GSSPositiveBasisNp1', 'TolBind',2);
     tic
-    [x_ps, obj_ps] = patternsearch(f, x0, A, B, Aeq, beq, lb, ub, [], opts);
+    %[x_ps, obj_ps] = patternsearch(f, x0, A, B, Aeq, beq, lb, ub, [], opts);
+    [x_ps, obj_ps] = ga(f, nvars, A, B, Aeq, beq, lb, ub);
     toc
 
     % display results
@@ -158,10 +155,7 @@ function metaheuristics()
     end
 
     % compose Aeq matrix (for constraints (4) on column sum)
-    Aeq = zeros(n, nvars);
-    for i = 0:m-1
-        Aeq(:,i*n+1:i*n+n) = eye(n);
-    end
+    Aeq = repmat(eye(n), 1, m);
     beq = ones(n, 1);
 
     run_problem(m, n, x_ps(1:m*n), c, A, b, Aeq, beq);
@@ -253,11 +247,9 @@ function metaheuristics()
     end
 
     % compose Aeq matrix (for constraint (4) on column sum)
-    Aeq = zeros(m, nvars);
-    for i = 1:m
-        Aeq(:,(i-1)*m+1:(i-1)*m+m) = eye(m);
-    end
-    beq = ones(m, 1);
+    Aeq = zeros(n, nvars);
+    Aeq(:,1:m*n) = repmat(eye(n), 1, m);
+    beq = ones(n, 1);
 
     x0 = zeros(nvars, 1);
 
@@ -299,16 +291,13 @@ function metaheuristics()
     end
 
     % compose Aeq matrix (for constraints (4) on column sum)
-    Aeq = zeros(n, nvars);
-    for i = 0:m-1
-        Aeq(:,i*n+1:i*n+n) = eye(n);
-    end
+    Aeq = repmat(eye(n), 1, m);
     beq = ones(n, 1);
 
     run_problem(m, n, x_ps(1:m*n), c, A, b, Aeq, beq);
 end
 
-function run_problem(m, n, x0, c, A, b, Aeq, beq)
+function run_problem(m, n, x0, c, A, b, Aeq, beq, A_vec)
     % prepare vars
     nvars = length(x0);
     lb = zeros(nvars, 1);
@@ -327,9 +316,10 @@ function run_problem(m, n, x0, c, A, b, Aeq, beq)
     % two inequality constraints equivalent to the equality constraint:
     A2 = [A;Aeq;-Aeq];
     b2 = [b;beq;-beq];
-    opts = optimoptions('ga','MaxStallGenerations',50,'FunctionTolerance',1e-10,'MaxGenerations',300,'ConstraintTolerance',1e-10);
+    %opts = optimoptions('ga','MaxStallGenerations',50,'FunctionTolerance',1e-10,'MaxGenerations',300,'ConstraintTolerance',1e-10);
+    opts = optimoptions('ga', 'InitialPopulation', x0');
     tic
-    [x_ga, obj_ga] = ga(f, nvars, A2, b2, [], [], lb, ub, [], 1:nvars);
+    [x_ga, ~] = ga(f, nvars, A2, b2, [], [], lb, ub, [], 1:nvars, opts);
     %x_ga = 0; obj_ga = 0;
     toc
     
@@ -338,26 +328,25 @@ function run_problem(m, n, x0, c, A, b, Aeq, beq)
     [x_intlinprog, obj_intlinprog] = intlinprog(c, 1:nvars, A, b, Aeq, beq, lb, ub);
     toc
 
-    % display results
-    disp_x_ps = sol_display(m, n, x_ps);
-    disp_x_ga = sol_display(m, n, x_ga);
+    % clean and display results
+    disp_x_ps = vector_to_matrix(m, n, x_ps);
+    disp_x_ga = sol_cleanup(m, n, x_ga, A_vec, c);
+    obj_ga = obj_func(m, n, matrix_to_vector(disp_x_ga), c);
+    %disp_x_ga = sol_display(m, n, x_ga);
     %disp_x_ga = x_ga;
-    disp_x_int = sol_display(m, n, x_intlinprog);
+    disp_x_int = vector_to_matrix(m, n, x_intlinprog);
 
-    disp('PATTERN SEARCH');
+    disp(['PATTERN SEARCH - Objective value (min): ', num2str(obj_ps)]);
     disp('Solution x =');
     disp(disp_x_ps);
-    disp(['Objective value (min): ', num2str(obj_ps)]);
 
-    disp('GENETIC ALGORITHM');
+    disp(['GENETIC ALGORITHM - Objective value (min): ', num2str(obj_ga)]);
     disp('Solution x =')
     disp(disp_x_ga);
-    disp(['Objective value (min): ', num2str(obj_ga)]);
 
-    disp('INTLINPROG');
+    disp(['INTLINPROG - Objective value (min): ', num2str(obj_intlinprog)]);
     disp('Solution x =');
     disp(disp_x_int);
-    disp(['Objective value (min): ', num2str(obj_intlinprog)]);
 end
 
 function obj = obj_func(m, n, x, c)
@@ -369,9 +358,43 @@ function obj = obj_func(m, n, x, c)
     end
 end
 
-function d = sol_display(m, n, x)
-    d = zeros(m,n);
+function v = matrix_to_vector(M)
+     v = reshape(M', [], 1);
+end
+
+function M = vector_to_matrix(m, n, v)
+    M = zeros(m,n);
     for i = 1:m
-        d(i,:) = x((i-1)*n+1:(i-1)*n+n);
+        M(i,:) = v((i-1)*n+1:(i-1)*n+n);
     end
 end
+
+function x = sol_cleanup(m, n, dirty_x, A, c)
+    % get A and c as matrix
+    A_mat = vector_to_matrix(m, n, A);
+    c_mat = vector_to_matrix(m, n, c);
+    % compute ratio matrix
+    ratios = -c_mat./A_mat;
+    
+    % new x is only zero, except for 1 coeff at the max(r) pos
+    x = zeros(m, n);
+    % get dirty_x as matrix
+    dirty_x_mat = vector_to_matrix(m, n, dirty_x);
+    % foreach column of the matrix
+    for i = 1:n
+        col = dirty_x_mat(:,i);
+        % get all non-zero values
+        col_nonzeros_ind = find(col);
+        % if there are more than one, clean
+        if length(col_nonzeros_ind) ~= 1
+            % get matching ratio columns at non-zero values indexes
+            r = ratios(col_nonzeros_ind, i);
+            % apply 1 coeff to x vector at the pos corresponding to r max
+            % value
+            x(r == max(r), i) = 1;
+        else
+            x(:,i) = dirty_x_mat(:,i);
+        end
+    end
+end
+
