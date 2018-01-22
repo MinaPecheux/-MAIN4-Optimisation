@@ -1,6 +1,6 @@
 function metaheuristics()
     % load data
-    inf = fopen('data-1/1/a10100', 'r');
+    inf = fopen('data-1/1/a0303', 'r');
     r_dimensions = textscan(inf, '%f', 2);
     r_values = textscan(inf, '%f');
     fclose(inf);
@@ -13,7 +13,7 @@ function metaheuristics()
     c = tmp(1:nvars);
     A_vec = tmp(nvars+1:2*nvars);
     b = tmp(2*nvars+1:end);
-
+    
     % compose A matrix from A vector (for constraints (3))
     A = zeros(m, nvars);
     for i = 1:m
@@ -26,7 +26,8 @@ function metaheuristics()
     Aeq = repmat(eye(n), 1, m);
     beq = ones(n, 1);
 
-    x0 = zeros(nvars, 1);
+%    x0 = zeros(nvars, 1);
+    x0 = matrix_to_vector(heuristique_regret(m, n, c, A_vec, b));
 
     % solve (P) problem
     % -----------------
@@ -303,14 +304,23 @@ function run_problem(m, n, x0, c, A, b, Aeq, beq, A_vec)
     lb = zeros(nvars, 1);
     ub = ones(nvars, 1);
     f = @(x) obj_func(m, n, x, c);
+    x0
 
+    % if passed initial solution is not feasible:
+    % find initial feasible solution
+    if x0 == zeros(nvars, 1)
+        opts = optimoptions('intlinprog', 'MaxTime', 10);
+        [x0, ~] = intlinprog(c, 1:nvars, A, b, Aeq, beq, lb, ub, opts);
+    end
+    
     % solve (P) problem with the 3 heuristics:
     % ----------------------------------------
     % PATTERNSEARCH
+    % {'GPSPositiveBasis2N'} | 'GPSPositiveBasisNp1' | 'GSSPositiveBasis2N' | 'GSSPositiveBasisNp1' | 'MADSPositiveBasis2N' | 'MADSPositiveBasisNp1'
     opts = optimoptions('patternsearch', 'ScaleMesh', false, 'MeshTolerance', 0.99); % force integer solutions
     tic
     [x_ps, obj_ps] = patternsearch(f, x0, A, b, Aeq, beq, lb, ub, [], opts);
-    toc
+    t_ps = toc;
     
     % GA: ga with integer vars takes no equality constraints: workaround is to add
     % two inequality constraints equivalent to the equality constraint:
@@ -321,12 +331,12 @@ function run_problem(m, n, x0, c, A, b, Aeq, beq, A_vec)
     tic
     [x_ga, ~] = ga(f, nvars, A2, b2, [], [], lb, ub, [], 1:nvars, opts);
     %x_ga = 0; obj_ga = 0;
-    toc
+    t_ga = toc;
     
     % INTLINPROG
     tic
     [x_intlinprog, obj_intlinprog] = intlinprog(c, 1:nvars, A, b, Aeq, beq, lb, ub);
-    toc
+    t_ilp = toc;
 
     % clean and display results
     disp_x_ps = vector_to_matrix(m, n, x_ps);
@@ -337,14 +347,17 @@ function run_problem(m, n, x0, c, A, b, Aeq, beq, A_vec)
     disp_x_int = vector_to_matrix(m, n, x_intlinprog);
 
     disp(['PATTERN SEARCH - Objective value (min): ', num2str(obj_ps)]);
+    disp(['Time: ', num2str(t_ps), ' sec']);
     disp('Solution x =');
     disp(disp_x_ps);
 
     disp(['GENETIC ALGORITHM - Objective value (min): ', num2str(obj_ga)]);
+    disp(['Time: ', num2str(t_ga), ' sec']);
     disp('Solution x =')
     disp(disp_x_ga);
 
     disp(['INTLINPROG - Objective value (min): ', num2str(obj_intlinprog)]);
+    disp(['Time: ', num2str(t_ilp), ' sec']);
     disp('Solution x =');
     disp(disp_x_int);
 end
