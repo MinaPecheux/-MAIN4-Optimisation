@@ -1,4 +1,4 @@
-function sol = heuristique_regret(m, n, c, A, b)
+function [sol, realisable] = heuristique_regret(m, n, c, A, b)
     % get A and c as matrix
     A_mat = vector_to_matrix(m, n, A);
     c_mat = vector_to_matrix(m, n, c);
@@ -13,18 +13,16 @@ function sol = heuristique_regret(m, n, c, A, b)
     zeta = 0;
     while ~isempty(J) && realisable == 1
         regmax = -Inf;
-        imax = 0;
-        jmax = 0;
         for j = J
             Rj = I(A_mat(:,j) < beta);
             if isempty(Rj)
                 realisable = 0;
             else
-                [minval, k] = min(f(Rj,j));
+                [~, k] = max(f(Rj,j));
                 if isempty(Rj(Rj ~= k))
                     reg = Inf;
                 else
-                    reg = f(k,j) - minval;
+                    reg = f(k,j) - max(f(Rj(Rj ~= k),j));
                 end
                 if reg > regmax
                     regmax = reg;
@@ -40,14 +38,17 @@ function sol = heuristique_regret(m, n, c, A, b)
             J = J(J ~= jmax);
         end
     end
+    
+    sol = zeros(m,n);
     if realisable == 1
         for j = 1:n
             k = x(j);
-            K = -c_mat(I(I~=k),:);
-            K = K(A_mat(I(I~=k),j) <= beta(k));
+            I_bis = I(I~=k);
+            K = -c_mat(I_bis,:);
+            K = K(A_mat(I_bis,j) <= beta(I_bis));
             if ~isempty(K)
-                [minval, q] = min(K);
-                if minval < -c_mat(k,j)
+                [maxval, q] = max(K);
+                if maxval > -c_mat(k,j)
                     x(j) = q;
                     zeta = zeta + c_mat(k,j) - c_mat(q,j);
                     beta(k) = beta(k) + A_mat(k,j);
@@ -55,11 +56,11 @@ function sol = heuristique_regret(m, n, c, A, b)
                 end
             end
         end
-    end
     
-    sol = zeros(m,n);
-    for j = 1:n
-        sol(x(j),j) = 1;
+        % create matrix solution
+        for j = 1:n
+            sol(x(j),j) = 1;
+        end
     end
 end
 
