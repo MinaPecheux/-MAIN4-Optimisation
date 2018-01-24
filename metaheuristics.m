@@ -1,6 +1,6 @@
 function metaheuristics()
     % load data
-    inf = fopen('data-1/1/a0303', 'r');
+    inf = fopen('data-1/1/a10100', 'r');
     r_dimensions = textscan(inf, '%f', 2);
     r_values = textscan(inf, '%f');
     fclose(inf);
@@ -27,11 +27,20 @@ function metaheuristics()
     beq = ones(n, 1);
 
 %    x0 = zeros(nvars, 1);
-    x0 = matrix_to_vector(heuristique_regret(m, n, c, A_vec, b));
+    [x0_mat, x0_realisable] = heuristique_regret(m, n, c, A_vec, b);
+    x0 = matrix_to_vector(x0_mat);
 
     % solve (P) problem
     % -----------------
-    run_problem(m, n, x0, c, A, b, Aeq, beq, A_vec);
+    % if initial solution is feasible:
+    if x0_realisable == 1
+        run_problem(m, n, x0, c, A, b, Aeq, beq, A_vec);
+    else
+        % else find initial feasible solution with interrupted intlinprog
+        opts = optimoptions('intlinprog', 'MaxTime', 10);
+        [x0, ~] = intlinprog(c, 1:nvars, A, b, Aeq, beq, lb, ub, opts);
+        run_problem(m, n, x0, c, A, b, Aeq, beq, A_vec);
+    end
 
     %%
     % solve (L) problem without constraints (10)
@@ -304,14 +313,6 @@ function run_problem(m, n, x0, c, A, b, Aeq, beq, A_vec)
     lb = zeros(nvars, 1);
     ub = ones(nvars, 1);
     f = @(x) obj_func(m, n, x, c);
-    x0
-
-    % if passed initial solution is not feasible:
-    % find initial feasible solution
-    if x0 == zeros(nvars, 1)
-        opts = optimoptions('intlinprog', 'MaxTime', 10);
-        [x0, ~] = intlinprog(c, 1:nvars, A, b, Aeq, beq, lb, ub, opts);
-    end
     
     % solve (P) problem with the 3 heuristics:
     % ----------------------------------------
@@ -335,12 +336,14 @@ function run_problem(m, n, x0, c, A, b, Aeq, beq, A_vec)
     
     % INTLINPROG
     tic
-    [x_intlinprog, obj_intlinprog] = intlinprog(c, 1:nvars, A, b, Aeq, beq, lb, ub);
+    [x_intlinprog, obj_intlinprog] = intlinprog(c, 1:nvars, A, b, Aeq, beq, lb, ub, x0);
     t_ilp = toc;
 
     % clean and display results
-    disp_x_ps = vector_to_matrix(m, n, x_ps);
-    disp_x_ga = sol_cleanup(m, n, x_ga, A_vec, c);
+    disp_x_ps = sol_cleanup_ps(m, n, x_ps, A_vec, c);
+    obj_ps = obj_func(m, n, matrix_to_vector(disp_x_ps), c);
+    %disp_x_ps = vector_to_matrix(m, n, x_ps);
+    disp_x_ga = sol_cleanup_ga(m, n, x_ga, A_vec, c);
     obj_ga = obj_func(m, n, matrix_to_vector(disp_x_ga), c);
     %disp_x_ga = sol_display(m, n, x_ga);
     %disp_x_ga = x_ga;
@@ -348,16 +351,19 @@ function run_problem(m, n, x0, c, A, b, Aeq, beq, A_vec)
 
     disp(['PATTERN SEARCH - Objective value (min): ', num2str(obj_ps)]);
     disp(['Time: ', num2str(t_ps), ' sec']);
+    disp(['Feasible: ', num2str(sol_check(disp_x_ps, A_vec, b))]);
     disp('Solution x =');
     disp(disp_x_ps);
 
     disp(['GENETIC ALGORITHM - Objective value (min): ', num2str(obj_ga)]);
     disp(['Time: ', num2str(t_ga), ' sec']);
+    disp(['Feasible: ', num2str(sol_check(disp_x_ga, A_vec, b))]);
     disp('Solution x =')
     disp(disp_x_ga);
 
     disp(['INTLINPROG - Objective value (min): ', num2str(obj_intlinprog)]);
     disp(['Time: ', num2str(t_ilp), ' sec']);
+    disp(['Feasible: ', num2str(sol_check(disp_x_int, A_vec, b))]);
     disp('Solution x =');
     disp(disp_x_int);
 end
@@ -382,7 +388,34 @@ function M = vector_to_matrix(m, n, v)
     end
 end
 
-function x = sol_cleanup(m, n, dirty_x, A, c)
+function x = sol_cleanup_ps(m, n, dirty_x, A, c)
+    % get A and c as matrix
+    A_mat = vector_to_matrix(m, n, A);
+    c_mat = vector_to_matrix(m, n, c);
+    % compute ratio matrix
+    ratios = -c_mat./A_mat;
+    
+    % new x is only zero, except for 1 coeff at the max efficacity pos
+    x = zeros(m, n);
+    % get dirty_x as matrix
+    dirty_x_mat = vector_to_matrix(m, n, dirty_x);
+    % foreach column of the matrix
+    for j = 1:n
+        col = dirty_x_mat(:,j);
+        % check if column has non-integer values
+        if floor(col) ~= col
+            % get matching ratio column
+            r = ratios(:, j);
+            % apply 1 coeff to x vector at the pos corresponding to r max
+            % value
+            x(r == max(r), j) = 1;
+        else
+            x(:,j) = dirty_x_mat(:,j);
+        end
+    end
+end
+
+function x = sol_cleanup_ga(m, n, dirty_x, A, c)
     % get A and c as matrix
     A_mat = vector_to_matrix(m, n, A);
     c_mat = vector_to_matrix(m, n, c);
@@ -394,20 +427,47 @@ function x = sol_cleanup(m, n, dirty_x, A, c)
     % get dirty_x as matrix
     dirty_x_mat = vector_to_matrix(m, n, dirty_x);
     % foreach column of the matrix
-    for i = 1:n
-        col = dirty_x_mat(:,i);
+    for j = 1:n
+        col = dirty_x_mat(:,j);
         % get all non-zero values
         col_nonzeros_ind = find(col);
         % if there are more than one, clean
         if length(col_nonzeros_ind) ~= 1
             % get matching ratio columns at non-zero values indexes
-            r = ratios(col_nonzeros_ind, i);
+            r = ratios(col_nonzeros_ind, j);
             % apply 1 coeff to x vector at the pos corresponding to r max
             % value
-            x(r == max(r), i) = 1;
+            x(r == max(r), j) = 1;
         else
-            x(:,i) = dirty_x_mat(:,i);
+            x(:,j) = dirty_x_mat(:,j);
         end
     end
 end
 
+function ok = sol_check(x, A_vec, b)
+    disp('Checking solution for feasibility.');
+    ok = 1;
+    [m, n] = size(x);
+    A = vector_to_matrix(m, n, A_vec);
+    tol = 0.1;
+    % check weight constraints (3)
+    for i = 1:m
+        if sum(A(i,:).*x(i,:)) > b(i)
+            disp(['Solution is infeasible: weight constraints (3) not ok for agent i=',num2str(i),':']);
+            disp(['A*x = ',num2str(sum(A(i,:).*x(i,:))),' > b = ',num2str(b(i))])
+            ok = 0;
+            return;
+        end
+    end
+    % check equality constraints (4)
+    for j = 1:n
+        if abs(sum(x(:,j)) - 1) > tol
+            disp(['Solution is infeasible: equality constraints (4) not ok for task j=',num2str(j),'.']);
+            disp(['Sum of column j = ',num2str(sum(x(:,j)))])
+            ok = 0;
+            return;
+        elseif abs(sum(x(:,j)) - 1) > 0
+            x(:,j) = round(x(:,j));
+        end
+    end
+end
