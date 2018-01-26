@@ -87,6 +87,24 @@ function [sol, realisable, zeta] = heuristique_regret(m, n, c, A, b)
 end
 
 function M = vector_to_matrix(m, n, v)
+    if m == 1
+        if isrow(v)
+            M = v;
+            return;
+        else
+            M = v';
+            return;
+        end
+    elseif n == 1
+        if isrow(v)
+            M = v';
+            return;
+        else
+            M = v;
+            return;
+        end
+    end
+
     M = zeros(m,n);
     for i = 1:m
         M(i,:) = v((i-1)*n+1:(i-1)*n+n);
