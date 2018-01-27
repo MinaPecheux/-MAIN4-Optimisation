@@ -13,7 +13,7 @@ function metaheuristics()
     %%
     % solve (L) problem without constraints (10)
     % ------------------------------------------
-    [m, n, A_vec, ~, b, c, ~, ~, x0, r_values] = read_problem('data-1/1/a0505');
+    [m, n, A_vec, ~, b, c, ~, ~, x0, r_values] = read_problem('data-1/1/a05100');
 
     % add zeros for no-cost z variables
     c = [c;zeros(m*n*m,1)];
@@ -145,9 +145,10 @@ function metaheuristics()
     Aeq = repmat(eye(n), 1, m);
     beq = ones(n, 1);
 
-    x0 = sol_cleanup_ga(m, n, x_ga(1:m*n), A_vec, c)
+    x0 = sol_cleanup_ga(m, n, x_ps(1:m*n), A_vec, c);
+    disp('x0 feasible?')
     sol_check(x0, A_vec, b)
-    %run_problem(m, n, matrix_to_vector(x0), c, A, b, Aeq, beq, false);
+    run_problem(m, n, matrix_to_vector(x0), c, A, b, Aeq, beq, A_vec, false);
 
     %%
     % solve (L) problem without constraints (11)
@@ -438,6 +439,7 @@ function x = sol_cleanup_ga(m, n, dirty_x, A, c)
     % foreach column of the matrix
     for j = 1:n
         col = dirty_x_mat(:,j);
+        col = round(col, 4);
         % get all non-zero values
         col_nonzeros_ind = find(col);
         % if there are more than one, clean
