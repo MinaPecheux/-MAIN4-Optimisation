@@ -3,7 +3,8 @@ function metaheuristics()
     % --------------------------
     
     % load file data + get initial feasible solution
-    [m, n, A_vec, A, b, c, Aeq, beq, x0] = read_problem('data-1/1/a0705');
+    [m, n, A_vec, A, b, c, Aeq, beq, x0] = read_problem('data-1/3/c20200');
+    disp(['x0 feasible ? Feasibility = ', num2str(sol_check(vector_to_matrix(m, n, x0), A_vec, b))]);
     % solve problem directly with patternsearch, ga, intlinprog
     %   -> option 'true' at the end to display solutions (turn to
     %   'false' to only get objective value, feasibility and exec time)
@@ -12,7 +13,7 @@ function metaheuristics()
     %%
     % solve (L) problem without constraints (10)
     % ------------------------------------------
-    [m, n, ~, ~, b, c, ~, ~, x0] = read_problem('data-1/1/a0505');
+    [m, n, A_vec, ~, b, c, ~, ~, x0, r_values] = read_problem('data-1/1/a0505');
 
     % add zeros for no-cost z variables
     c = [c;zeros(m*n*m,1)];
@@ -85,26 +86,43 @@ function metaheuristics()
     ub = [ones(m*n, 1);Inf*ones(nvars - m*n, 1)];
 
     % solve problem
-% si on veut utiliser PATTERNSEARCH... mais semble moins efficace !
-%     opts = optimoptions('patternsearch', 'TolBind', 0.5);
-%     tic
-%     [x_ps, obj_ps] = patternsearch(f, x0, A, B, Aeq, beq, lb, ub, [], opts);
-%     toc
+% en utilisant GA
     opts = optimoptions('ga', 'InitialPopulation', x0);
+    disp('GENETIC ALGORITHM: Starting (L) resolution...');
     tic
     [x_ga, obj_ga] = ga(f, nvars, A, B, Aeq, beq, lb, ub, [], []);
-    toc
+    tps_l = toc;
 
     % display results
     disp_x_ga = vector_to_matrix(m, n, x_ga(1:m*n));
     disp_z_ga = vector_to_matrix(m*m, n, x_ga(m*n+1:end));
 
     disp('GENETIC ALGORITHM');
+    disp(['Solved (L): ',num2str(tps_l),' sec']);
     disp('Solution x =')
     disp(disp_x_ga);
     disp('Solution z =')
     disp(disp_z_ga);
     disp(['Objective value (min): ', num2str(obj_ga)]);
+    
+% si on veut utiliser PATTERNSEARCH... mais semble moins efficace !
+%     opts = optimoptions('patternsearch', 'PollMethod', 'GPSPositiveBasisNp1', 'UseCompletePoll', true, 'TolBind', 0.5);
+%     disp('PATTERNSEARCH: Starting (L) resolution...');
+%     tic
+%     [x_ps, obj_ps] = patternsearch(f, x0, A, B, Aeq, beq, lb, ub, [], opts);
+%     tps_l = toc;
+% 
+%     % display results
+%     disp_x_ps = vector_to_matrix(m, n, x_ps(1:m*n));
+%     disp_z_ps = vector_to_matrix(m*m, n, x_ps(m*n+1:end));
+% 
+%     disp('PATTERNSEARCH');
+%     disp(['Solved (L): ',num2str(tps_l),' sec']);
+%     disp('Solution x =')
+%     disp(disp_x_ps);
+%     disp('Solution z =')
+%     disp(disp_z_ps);
+%     disp(['Objective value (min): ', num2str(obj_ps)]);
 
     % re-solve (P) problem
     % --------------------
@@ -127,7 +145,9 @@ function metaheuristics()
     Aeq = repmat(eye(n), 1, m);
     beq = ones(n, 1);
 
-    run_problem(m, n, x_ga(1:m*n)', c, A, b, Aeq, beq, false);
+    x0 = sol_cleanup_ga(m, n, x_ga(1:m*n), A_vec, c)
+    sol_check(x0, A_vec, b)
+    %run_problem(m, n, matrix_to_vector(x0), c, A, b, Aeq, beq, false);
 
     %%
     % solve (L) problem without constraints (11)
@@ -277,7 +297,7 @@ function run_problem(m, n, x0, c, A, b, Aeq, beq, A_vec, show_solutions)
     % ----------------------------------------
     % PATTERNSEARCH
     % {'GPSPositiveBasis2N'} | 'GPSPositiveBasisNp1' | 'GSSPositiveBasis2N' | 'GSSPositiveBasisNp1' | 'MADSPositiveBasis2N' | 'MADSPositiveBasisNp1'
-    opts = optimoptions('patternsearch', 'ScaleMesh', false, 'MeshTolerance', 0.99); % force integer solutions
+    opts = optimoptions('patternsearch', 'PollMethod', 'GSSPositiveBasisNp1', 'UseCompletePoll', true, 'ScaleMesh', false, 'MeshTolerance', 0.99); % force integer solutions
     tic
     [x_ps, obj_ps] = patternsearch(f, x0, A, b, Aeq, beq, lb, ub, [], opts);
     %x_ps = zeros(nvars,1);
@@ -375,9 +395,9 @@ function M = vector_to_matrix(m, n, v)
     end
 end
 
-function x = sol_cleanup_ps(m, n, dirty_x, A, c)
+function x = sol_cleanup_ps(m, n, dirty_x, A_vec, c)
     % get A and c as matrix
-    A_mat = vector_to_matrix(m, n, A);
+    A_mat = vector_to_matrix(m, n, A_vec);
     c_mat = vector_to_matrix(m, n, c);
     % compute ratio matrix
     ratios = -c_mat./A_mat;
@@ -389,8 +409,10 @@ function x = sol_cleanup_ps(m, n, dirty_x, A, c)
     % foreach column of the matrix
     for j = 1:n
         col = dirty_x_mat(:,j);
+        col = round(col, 4);
+%        disp([col floor(col) (col ~= floor(col))])
         % check if column has non-integer values
-        if floor(col) ~= col
+        if any(col ~= floor(col) > 0)
             % get matching ratio column
             r = ratios(:, j);
             % apply 1 coeff to x vector at the pos corresponding to r min
@@ -439,7 +461,7 @@ function ok = sol_check(x, A_vec, b)
     tol = 0.1;
     % check weight constraints (3)
     for i = 1:m
-        if sum(A(i,:).*x(i,:)) > b(i)
+        if sum(A(i,:).*x(i,:)) - tol > b(i)
             disp(['Solution is infeasible: weight constraints (3) not ok for agent i=',num2str(i),':']);
             disp(['A*x = ',num2str(sum(A(i,:).*x(i,:))),' > b = ',num2str(b(i))])
             ok = 0;

@@ -1,4 +1,4 @@
-function [m, n, A_vec, A, b, c, Aeq, beq, x0] = read_problem(file)
+function [m, n, A_vec, A, b, c, Aeq, beq, x0, r_values] = read_problem(file)
     % load data
     inf = fopen(file, 'r');
     r_dimensions = textscan(inf, '%f', 2);
@@ -35,10 +35,12 @@ function x0 = sol_initial(m, n, c, A_vec, b, A, Aeq, beq)
 
     % if x0 is not feasible:
     % find initial feasible solution with interrupted intlinprog
-    if x0_realisable == 0
+%    if x0_realisable == 0
+    if sol_check(x0_mat, A_vec, b) == 0
         opts = optimoptions('intlinprog', 'MaxFeasiblePoints', 1);
-        lb = zeros(m*n,1);
-        ub = ones(m*n,1);
+        nvars = m*n;
+        lb = zeros(nvars,1);
+        ub = ones(nvars,1);
         [x0, ~] = intlinprog(c, 1:nvars, A, b, Aeq, beq, lb, ub, [], opts);
     end
 end
@@ -69,5 +71,33 @@ function M = vector_to_matrix(m, n, v)
     M = zeros(m,n);
     for i = 1:m
         M(i,:) = v((i-1)*n+1:(i-1)*n+n);
+    end
+end
+
+function ok = sol_check(x, A_vec, b)
+    disp('Checking solution for feasibility.');
+    ok = 1;
+    [m, n] = size(x);
+    A = vector_to_matrix(m, n, A_vec);
+    tol = 0.1;
+    % check weight constraints (3)
+    for i = 1:m
+        if sum(A(i,:).*x(i,:)) > b(i)
+            disp(['Solution is infeasible: weight constraints (3) not ok for agent i=',num2str(i),':']);
+            disp(['A*x = ',num2str(sum(A(i,:).*x(i,:))),' > b = ',num2str(b(i))])
+            ok = 0;
+            return;
+        end
+    end
+    % check equality constraints (4)
+    for j = 1:n
+        if abs(sum(x(:,j)) - 1) > tol
+            disp(['Solution is infeasible: equality constraints (4) not ok for task j=',num2str(j),'.']);
+            disp(['Sum of column j = ',num2str(sum(x(:,j))),': ',num2str(sum(x(:,j)))])
+            ok = 0;
+            return;
+        elseif abs(sum(x(:,j)) - 1) > 0
+            x(:,j) = round(x(:,j));
+        end
     end
 end
