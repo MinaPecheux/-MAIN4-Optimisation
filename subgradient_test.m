@@ -1,7 +1,7 @@
 function subgradient_test()
 
 % load data
-f = fopen('data-1/1/a0202', 'r');
+f = fopen('data-1/1/a0303', 'r');
 r_dimensions = textscan(f, '%f', 2);
 r_values = textscan(f, '%f');
 fclose(f);
@@ -26,7 +26,7 @@ iterLimit = 100;
 DualNoChangTOL = 2;
 
 [pi_k, theta_pi_k] = sub_grad( epsilon, ro, pi_zero, iterLimit, DualNoChangTOL,a,b,c);
-
+disp(theta_pi_k)
 end
 
 
@@ -165,10 +165,12 @@ Beq = ones(n,1);
 LB = zeros(m*n, 1);
 UB = ones(m*n, 1);
 
-[~,theta_chap] = intlinprog(c, 1:m*n, A,b, Aeq, Beq, LB, UB, x_0(1:m*n));
+f = @(x) sum(c .* x);
 
-% f = @(x) sum(c .* x);
-% [~,theta_chap] = patternsearch(f, x_0(1:m*n), A,b, Aeq, Beq, LB, UB);
+opts = optimoptions('patternsearch', 'PollMethod', 'GSSPositiveBasisNp1', 'UseCompletePoll', true, 'ScaleMesh', false, 'MeshTolerance', 0.99);
+
+%[~,theta_chap] = intlinprog(c, 1:m*n, A,b, Aeq, Beq, LB, UB, x_0(1:m*n));
+[~,theta_chap] = patternsearch(f, x_0(1:m*n), A,b, Aeq, Beq, LB, UB, [], opts);
 
 end
 
