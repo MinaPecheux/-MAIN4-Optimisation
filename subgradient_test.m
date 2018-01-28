@@ -68,7 +68,7 @@ while( condition )
             pi_k(j) = max(0, pi_k(j) - (theta_pi_k - theta_chap)/norm(gamma_k)*ro*gamma_k(j) );
         end
         k = k + 1;
-        condition = abs(L_10(x_k,pi_k, a, b, c)-theta_pi_k) / theta_pi_k > epsilon || k<iterLimit;
+        condition = abs(L_10(x_k,pi_k, a, b, c)-theta_pi_k) / theta_pi_k > epsilon && k<iterLimit;
     end
    
 end
