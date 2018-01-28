@@ -1,7 +1,7 @@
 function subgradient_test()
 
 % load data
-f = fopen('data-1/1/a0202', 'r');
+f = fopen('data-1/1/a0303', 'r');
 r_dimensions = textscan(f, '%f', 2);
 r_values = textscan(f, '%f');
 fclose(f);
@@ -16,7 +16,7 @@ a_vec = tmp(nvars+1:2*nvars);
 b = tmp(2*nvars+1:end);
 
 % compose a matrix from a vector
-a = reshape(a_vec, [n,m])';
+a = vector_to_matrix(m, n, a_vec);
 
 % define parameters used in sub_grad algorithm
 epsilon = 0.1;
@@ -25,12 +25,20 @@ pi_zero = zeros(m*m,1);
 iterLimit = 100;
 DualNoChangTOL = 2;
 
-[pi_k, theta_pi_k] = sub_grad( epsilon, ro, pi_zero, iterLimit, DualNoChangTOL,a,b,c);
+[x_k, theta_pi_k] = sub_grad( epsilon, ro, pi_zero, iterLimit, DualNoChangTOL,a,b,c);
+
+disp('Objective function value:')
+disp(theta_pi_k)
+disp('dirty x:')
+disp( reshape(x_k(1:m*n), m,n)' )
+disp('clean x:')
+clean_x = sol_cleanup_ps(m, n, x_k, a_vec, c);
+disp(clean_x)
 
 end
 
 
-function [pi_k, theta_pi_k] = sub_grad( epsilon, ro, pi_zero, iterLimit, DualNoChangTOL,a,b,c)
+function [x_k, theta_pi_k] = sub_grad( epsilon, ro, pi_zero, iterLimit, DualNoChangTOL,a,b,c)
 
 [m,~] = size(a);
 
@@ -165,10 +173,12 @@ Beq = ones(n,1);
 LB = zeros(m*n, 1);
 UB = ones(m*n, 1);
 
-[~,theta_chap] = intlinprog(c, 1:m*n, A,b, Aeq, Beq, LB, UB, x_0(1:m*n));
+f = @(x) sum(c .* x);
 
-% f = @(x) sum(c .* x);
-% [~,theta_chap] = patternsearch(f, x_0(1:m*n), A,b, Aeq, Beq, LB, UB);
+opts = optimoptions('patternsearch', 'PollMethod', 'GSSPositiveBasisNp1', 'UseCompletePoll', true, 'ScaleMesh', false, 'MeshTolerance', 0.99);
+
+%[~,theta_chap] = intlinprog(c, 1:m*n, A,b, Aeq, Beq, LB, UB, x_0(1:m*n));
+[~,theta_chap] = patternsearch(f, x_0(1:m*n), A,b, Aeq, Beq, LB, UB, [], opts);
 
 end
 
@@ -197,4 +207,61 @@ for i = 1:m
     end
 end
 
+end
+
+function x = sol_cleanup_ps(m, n, dirty_x, A_vec, c)
+    % get A and c as matrix
+    A_mat = vector_to_matrix(m, n, A_vec);
+    c_mat = vector_to_matrix(m, n, c);
+    
+    % compute ratio matrix
+    ratios = -c_mat./A_mat;
+    
+    % new x is only zero, except for 1 coeff at the max efficacity pos
+    x = zeros(m, n);
+    % get dirty_x as matrix
+    dirty_x_mat = vector_to_matrix(m, n, dirty_x);
+    % foreach column of the matrix
+    for j = 1:n
+        col = dirty_x_mat(:,j);
+        col = round(col, 4);
+%        disp([col floor(col) (col ~= floor(col))])
+        % check if column has non-integer values
+        if any(col ~= floor(col) > 0)
+            % get matching ratio column
+            r = ratios(:, j);
+            % get first min index
+            ind = find(r == min(r), 1, 'first');
+            % apply 1 coeff to x vector at the pos corresponding to r min
+            % value
+            x(ind, j) = 1;
+        else
+            x(:,j) = dirty_x_mat(:,j);
+        end
+    end
+end
+
+function M = vector_to_matrix(m, n, v)
+    if m == 1
+        if isrow(v)
+            M = v;
+            return;
+        else
+            M = v';
+            return;
+        end
+    elseif n == 1
+        if isrow(v)
+            M = v';
+            return;
+        else
+            M = v;
+            return;
+        end
+    end
+
+    M = zeros(m,n);
+    for i = 1:m
+        M(i,:) = v((i-1)*n+1:(i-1)*n+n);
+    end
 end

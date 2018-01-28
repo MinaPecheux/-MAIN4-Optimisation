@@ -3,7 +3,7 @@ function metaheuristics()
     % --------------------------
     
     % load file data + get initial feasible solution
-    [m, n, A_vec, A, b, c, Aeq, beq, x0] = read_problem('data-1/3/c20200');
+    [m, n, A_vec, A, b, c, Aeq, beq, x0] = read_problem('data-1/2/b10100');
     disp(['x0 feasible ? Feasibility = ', num2str(sol_check(vector_to_matrix(m, n, x0), A_vec, b))]);
     % solve problem directly with patternsearch, ga, intlinprog
     %   -> option 'true' at the end to display solutions (turn to
@@ -87,42 +87,42 @@ function metaheuristics()
 
     % solve problem
 % en utilisant GA
-    opts = optimoptions('ga', 'InitialPopulation', x0);
-    disp('GENETIC ALGORITHM: Starting (L) resolution...');
-    tic
-    [x_ga, obj_ga] = ga(f, nvars, A, B, Aeq, beq, lb, ub, [], []);
-    tps_l = toc;
-
-    % display results
-    disp_x_ga = vector_to_matrix(m, n, x_ga(1:m*n));
-    disp_z_ga = vector_to_matrix(m*m, n, x_ga(m*n+1:end));
-
-    disp('GENETIC ALGORITHM');
-    disp(['Solved (L): ',num2str(tps_l),' sec']);
-    disp('Solution x =')
-    disp(disp_x_ga);
-    disp('Solution z =')
-    disp(disp_z_ga);
-    disp(['Objective value (min): ', num2str(obj_ga)]);
-    
-% si on veut utiliser PATTERNSEARCH... mais semble moins efficace !
-%     opts = optimoptions('patternsearch', 'PollMethod', 'GPSPositiveBasisNp1', 'UseCompletePoll', true, 'TolBind', 0.5);
-%     disp('PATTERNSEARCH: Starting (L) resolution...');
+%     opts = optimoptions('ga', 'InitialPopulation', x0', 'Display', 'iter', 'PlotFcn', @gaplotbestf);
+%     disp('GENETIC ALGORITHM: Starting (L) resolution...');
 %     tic
-%     [x_ps, obj_ps] = patternsearch(f, x0, A, B, Aeq, beq, lb, ub, [], opts);
+%     [x_ga, obj_ga] = ga(f, nvars, A, B, Aeq, beq, lb, ub, [], [], opts);
 %     tps_l = toc;
 % 
 %     % display results
-%     disp_x_ps = vector_to_matrix(m, n, x_ps(1:m*n));
-%     disp_z_ps = vector_to_matrix(m*m, n, x_ps(m*n+1:end));
+%     disp_x_ga = vector_to_matrix(m, n, x_ga(1:m*n));
+%     disp_z_ga = vector_to_matrix(m*m, n, x_ga(m*n+1:end));
 % 
-%     disp('PATTERNSEARCH');
+%     disp('GENETIC ALGORITHM');
 %     disp(['Solved (L): ',num2str(tps_l),' sec']);
 %     disp('Solution x =')
-%     disp(disp_x_ps);
+%     disp(disp_x_ga);
 %     disp('Solution z =')
-%     disp(disp_z_ps);
-%     disp(['Objective value (min): ', num2str(obj_ps)]);
+%     disp(disp_z_ga);
+%     disp(['Objective value (min): ', num2str(obj_ga)]);
+    
+% en utilisant PATTERNSEARCH
+    opts = optimoptions('patternsearch', 'PollMethod', 'GPSPositiveBasisNp1', 'UseCompletePoll', true, 'Display', 'iter');
+    disp('PATTERNSEARCH: Starting (L) resolution...');
+    tic
+    [x_ps, obj_ps] = patternsearch(f, x0, A, B, Aeq, beq, lb, ub, [], opts);
+    tps_l = toc;
+
+    % display results
+    disp_x_ps = vector_to_matrix(m, n, x_ps(1:m*n));
+    disp_z_ps = vector_to_matrix(m*m, n, x_ps(m*n+1:end));
+
+    disp('PATTERNSEARCH');
+    disp(['Solved (L): ',num2str(tps_l),' sec']);
+    disp('Solution x =')
+    disp(disp_x_ps);
+    disp('Solution z =')
+    disp(disp_z_ps);
+    disp(['Objective value (min): ', num2str(obj_ps)]);
 
     % re-solve (P) problem
     % --------------------
@@ -145,31 +145,21 @@ function metaheuristics()
     Aeq = repmat(eye(n), 1, m);
     beq = ones(n, 1);
 
-    x0 = sol_cleanup_ga(m, n, x_ps(1:m*n), A_vec, c);
-    disp('x0 feasible?')
-    sol_check(x0, A_vec, b)
+    x0 = sol_cleanup_ps(m, n, x_ps(1:m*n), A_vec, c);
+    disp(['x0 feasible? Feasibility: ',num2str(sol_check(x0, A_vec, b))])
     run_problem(m, n, matrix_to_vector(x0), c, A, b, Aeq, beq, A_vec, false);
 
     %%
     % solve (L) problem without constraints (11)
     % ------------------------------------------
-    % load data
-    inf = fopen('data-1/1/a05100', 'r');
-    r_dimensions = textscan(inf, '%f', 2);
-    r_values = textscan(inf, '%f');
-    fclose(inf);
+    [m, n, A_vec, ~, b, c, ~, ~, x0, r_values] = read_problem('data-1/1/a05100');
 
-    m = r_dimensions{1}(1);
-    n = r_dimensions{1}(2);
-
-    tmp = r_values{1};
-    c = [tmp(1:m*n);zeros(m*n*m,1)];    % add zeros for no-cost z variables
-    A_vec = tmp(m*n+1:2*m*n);
-    b = tmp(2*m*n+1:end);
-
+    % add zeros for no-cost z variables
+    c = [c;zeros(m*n*m,1)];
+    x0 = [x0;zeros(m*n*m,1)];
     % objective function
     f = @(x) obj_func(m, n, x, c);
-
+    
     nvars = m*n * (1+m); % (x_11,...,x_mn,z_11^1,...,z_1n^1,...,z_n1^m,z_nm^m)
 
     % compose A matrix (for constraints (10) + (13) + (14) + (15))
@@ -241,22 +231,22 @@ function metaheuristics()
     Aeq(:,1:m*n) = repmat(eye(n), 1, m);
     beq = ones(n, 1);
 
-    x0 = zeros(nvars, 1);
-
     lb = zeros(nvars, 1);
     ub = [ones(m*n, 1);Inf*ones(nvars - m*n, 1)];
 
-    % solve problem
-    opts = optimoptions('patternsearch','TolBind',0.2);
+    % solve (L) problem with patternsearch
+    opts = optimoptions('patternsearch', 'PollMethod', 'GSSPositiveBasisNp1', 'UseCompletePoll', true, 'Display', 'iter');
+    disp('PATTERNSEARCH: Starting (L) resolution...');
     tic
     [x_ps, obj_ps] = patternsearch(f, x0, A, B, Aeq, beq, lb, ub, [], opts);
-    toc
+    tps_l = toc;
 
     % display results
-    disp_x_ps = sol_display(m, n, x_ps(1:m*n));
-    disp_z_ps = sol_display(m*m, n, x_ps(m*n+1:end));
+    disp_x_ps = vector_to_matrix(m, n, x_ps(1:m*n));
+    disp_z_ps = vector_to_matrix(m*m, n, x_ps(m*n+1:end));
 
-    disp('PATTERN SEARCH');
+    disp('PATTERNSEARCH');
+    disp(['Solved (L): ',num2str(tps_l),' sec']);
     disp('Solution x =')
     disp(disp_x_ps);
     disp('Solution z =')
@@ -284,7 +274,9 @@ function metaheuristics()
     Aeq = repmat(eye(n), 1, m);
     beq = ones(n, 1);
 
-    run_problem(m, n, x_ps(1:m*n), c, A, b, Aeq, beq);
+    x0 = sol_cleanup_ps(m, n, x_ps(1:m*n), A_vec, c);
+    disp(['x0 feasible? Feasibility: ',num2str(sol_check(x0, A_vec, b))])
+    run_problem(m, n, matrix_to_vector(x0), c, A, b, Aeq, beq, A_vec, false);
 end
 
 function run_problem(m, n, x0, c, A, b, Aeq, beq, A_vec, show_solutions)
@@ -416,9 +408,11 @@ function x = sol_cleanup_ps(m, n, dirty_x, A_vec, c)
         if any(col ~= floor(col) > 0)
             % get matching ratio column
             r = ratios(:, j);
+            % get first min index
+            ind = find(r == min(r), 1, 'first');
             % apply 1 coeff to x vector at the pos corresponding to r min
             % value
-            x(r == min(r), j) = 1;
+            x(ind, j) = 1;
         else
             x(:,j) = dirty_x_mat(:,j);
         end
@@ -442,13 +436,20 @@ function x = sol_cleanup_ga(m, n, dirty_x, A, c)
         col = round(col, 4);
         % get all non-zero values
         col_nonzeros_ind = find(col);
-        % if there are more than one, clean
-        if length(col_nonzeros_ind) ~= 1
+        % if there is none, clean
+        if isempty(col_nonzeros_ind)
             % get matching ratio columns at non-zero values indexes
             r = ratios(col_nonzeros_ind, j);
-            % apply 1 coeff to x vector at the pos corresponding to r min
+            % apply 1 coeff to x vector at the pos corresponding to r max
             % value
-            x(r == min(r), j) = 1;
+            x(r == max(r), j) = 1;
+        % if there are more than one, clean
+        elseif length(col_nonzeros_ind) > 1
+            % get matching ratio columns at non-zero values indexes
+            r = ratios(col_nonzeros_ind, j);
+            % apply 1 coeff to x vector at the pos corresponding to r max
+            % value
+            x(col_nonzeros_ind(r == max(r)), j) = 1;
         else
             x(:,j) = dirty_x_mat(:,j);
         end
@@ -460,7 +461,7 @@ function ok = sol_check(x, A_vec, b)
     ok = 1;
     [m, n] = size(x);
     A = vector_to_matrix(m, n, A_vec);
-    tol = 0.1;
+    tol = 1e-3;
     % check weight constraints (3)
     for i = 1:m
         if sum(A(i,:).*x(i,:)) - tol > b(i)
@@ -474,7 +475,7 @@ function ok = sol_check(x, A_vec, b)
     for j = 1:n
         if abs(sum(x(:,j)) - 1) > tol
             disp(['Solution is infeasible: equality constraints (4) not ok for task j=',num2str(j),'.']);
-            disp(['Sum of column j = ',num2str(sum(x(:,j))),': ',num2str(sum(x(:,j)))])
+            disp(['Sum of column j = ',num2str(j),': ',num2str(sum(x(:,j)))])
             ok = 0;
             return;
         elseif abs(sum(x(:,j)) - 1) > 0
