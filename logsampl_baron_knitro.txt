@@ -1,0 +1,58 @@
+# Experience : Resolution (M)
+# Solver     : baron et knitro 
+# Maxtime    : 2 heures 
+
+#Knitro:	   M    N        M_OPT       M_TIME
+		   5  100     1701.000       15.891 
+
+#Baron:   M    N        M_OPT       M_TIME
+		   5  100     1700.000       10.484 
+
+# Experience : Resolution (M)
+# Solver     : baron et knitro 
+# Maxtime    : 2 heures 
+
+#Knitro:	   M    N        M_OPT       M_TIME
+		   5  110     1938.000       56.234 
+
+#Baron:   M    N        M_OPT       M_TIME
+		   5  110     1938.000       14.375 
+
+# Experience : Resolution (M)
+# Solver     : baron et knitro 
+# Maxtime    : 2 heures 
+
+#Knitro:	   M    N        M_OPT       M_TIME
+		   5  110     1938.000       56.922 
+
+#Baron:   M    N        M_OPT       M_TIME
+		   5  110     1938.000       14.500 
+
+# Experience : Resolution (M)
+# Solver     : baron et knitro 
+# Maxtime    : 2 heures 
+
+#Knitro:	   M    N        M_OPT       M_TIME
+		   5  120     2125.000      109.312 
+
+#Baron:   M    N        M_OPT       M_TIME
+		   5  120     2125.000       15.078 
+
+# Experience : Resolution (M)
+# Solver     : baron et knitro 
+# Maxtime    : 2 heures 
+
+#Knitro:	   M    N        M_OPT       M_TIME
+		   5  130     2306.000        8.750 
+
+#Baron:   M    N        M_OPT       M_TIME
+		   5  130     2306.000        5.594 
+# Experience : Resolution (M)
+# Solver     : baron et knitro 
+# Maxtime    : 2 heures 
+
+#Knitro:	   M    N        M_OPT       M_TIME
+		   5  200     3235.000      157.750 
+
+#Baron:   M    N        M_OPT       M_TIME
+		   5  200     3235.000       13.344 

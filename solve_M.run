@@ -6,45 +6,47 @@ reset;
 
 #---- Options
 
-option solver cplex;
-#option xpress_options "maxtime=7200";
+option solver knitro;
+option knitro_options "alg=1 ma_terminate=1 ma_maxtime_cpu=60 ma_maxtime_real=60";
 
 #----Output filename
 param OUTPUTFILE symbolic;
-let OUTPUTFILE := 'logsampl.txt';
+let OUTPUTFILE := 'logsampl_baron_knitro.txt';
 
 #---- Instances
 param nbrInstances := 1;
 
 set Instances default {};
-let Instances := {"data-1/1/a0202b"};
+let Instances := {"data-1/1/a05130"};
 # OTHER FILES CANNOT BE SOLVED WITH DEMO VERSION: too much data!
 
 #---- For logs
 param Nrows {1 .. nbrInstances};
 param Ncols {1 .. nbrInstances};
 
-param POpt {1 .. nbrInstances};
-param PTime {1 .. nbrInstances};
+#param POpt {1 .. nbrInstances};
+#param PTime {1 .. nbrInstances};
 param MOpt {1 .. nbrInstances};
 param MTime {1 .. nbrInstances};
-param LOpt {1 .. nbrInstances};
-param LTime {1 .. nbrInstances};
+param KnitroOpt {1 .. nbrInstances};
+param KnitroTime {1 .. nbrInstances};
+#param LOpt {1 .. nbrInstances};
+#param LTime {1 .. nbrInstances};
 
 param NumInstance integer default 0;
 
 #---- Log headings
-printf "# Experience : Resolution (P) et (L) \n" >> (OUTPUTFILE);
-printf "# Solver     : Cplex \n" >> (OUTPUTFILE);
+printf "# Experience : Resolution (M)\n" >> (OUTPUTFILE);
+printf "# Solver     : baron et knitro \n" >> (OUTPUTFILE);
 printf "# Maxtime    : 2 heures \n\n" >> (OUTPUTFILE);
 
-printf "#   %4s %4s %12s %12s %12s %12s \n", 'M', 'N', 'P_OPT', 'P_TIME', 'L_OPT','L_TIME' >> (OUTPUTFILE);
+printf "#Knitro:\t%4s %4s %12s %12s\n", 'M', 'N', 'M_OPT', 'M_TIME' >> (OUTPUTFILE);
 
 #---- Defining models
 model models.mod;
-problem P: x, agents_capacities, tasks_to_agents, Objective;
+#problem P: x, agents_capacities, tasks_to_agents, Objective;
 problem Mprob: x, agents_capacities_M, cap_M, tasks_to_agents, Objective;
-problem L: x, z, agents_capacities_lin, tasks_to_agents, cap_lin, lin_const1, lin_const2, lin_const3, Objective;
+#problem L: x, z, agents_capacities_lin, tasks_to_agents, cap_lin, lin_const1, lin_const2, lin_const3, Objective;
 
 #---- Solving problems
 for{file in Instances}{
@@ -86,27 +88,20 @@ for{file in Instances}{
 	}
    printf "\n";
    
-   #------
-   # Solve the primary problem (P)
-   #------------------------------
-   solve P; printf "(P) problem solved ... \n\n";
+   printf "b matrix\n";
 	for{i in I} {
-		for{j in J} {
-			printf '%.2f\t', x[i,j];
-		}
-		printf "\n";
+		printf '%.2f\n', b[i];
 	}
    printf "\n";
-
-   let    POpt[NumInstance] := Objective.val;
-   let   PTime[NumInstance] := _solve_time;
-
+ 
+ 
    reset data x;
+   
 
    #------
-   # Solve the auxiliary problem (M)
+   # Solve the auxiliary problem (M) with baron
    #------------------------------
-   solve Mprob; printf "(M) problem solved ... \n\n";
+   solve Mprob; printf "(M) problem solved with baron ... \n\n";
 	for{i in I} {
 		for{j in J} {
 			printf '%.2f\t', x[i,j];
@@ -117,15 +112,24 @@ for{file in Instances}{
 
    let    MOpt[NumInstance] := Objective.val;
    let   MTime[NumInstance] := _solve_time;
-
+   
+   #-- Logs ...
+   printf "\t\t%4d %4d %12.3f %12.3f \n", Nrows[NumInstance], Ncols[NumInstance], MOpt[NumInstance], MTime[NumInstance] >> (OUTPUTFILE);
+   
+   
+   printf "\n#Baron:%4s %4s %12s %12s\n", 'M', 'N', 'M_OPT', 'M_TIME' >> (OUTPUTFILE);
+   
+   #------
+   # Solve the auxiliary problem (M) with knitro
+   #------------------------------   
    reset data x;
 
-   #------
-   # Solve the linearized problem (L)
-   #---------------------------------
+	#---- Options
 
-   # CANNOT BE SOLVED WITH DEMO VERSION: too much data!
-   solve L; printf "(L) problem solved ... \n\n";
+	option solver baron;
+	option baron_options "maxtime=60";
+	
+	solve Mprob; printf "(M) problem solved with knitro ... \n\n";
 	for{i in I} {
 		for{j in J} {
 			printf '%.2f\t', x[i,j];
@@ -134,10 +138,14 @@ for{file in Instances}{
 	}
    printf "\n";
 
-   let    LOpt[NumInstance] := Objective.val;
-   let   LTime[NumInstance] := _solve_time;
+   let   KnitroOpt[NumInstance] := Objective.val;
+   let   KnitroTime[NumInstance] := _solve_time;
+   
    #-- Logs ...
-   printf "    %4d %4d %12.3f %12.3f %12.3f %12.3f \n", Nrows[NumInstance], Ncols[NumInstance], POpt[NumInstance], PTime[NumInstance], LOpt[NumInstance],LTime[NumInstance] >> (OUTPUTFILE);
+   printf "\t\t%4d %4d %12.3f %12.3f \n", Nrows[NumInstance], Ncols[NumInstance], KnitroOpt[NumInstance], KnitroTime[NumInstance] >> (OUTPUTFILE);
+   
+   
+
 }
 
 printf "\n" >> (OUTPUTFILE);
