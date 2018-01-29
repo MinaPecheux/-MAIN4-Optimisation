@@ -11,7 +11,7 @@
 
 function subgradient()
     % load data
-    f = fopen('../data-1/1/a0203', 'r');
+    f = fopen('../data-1/1/a0507', 'r');
     r_dimensions = textscan(f, '%f', 2);
     r_values = textscan(f, '%f');
     fclose(f);
@@ -22,11 +22,11 @@ function subgradient()
 
     tmp = r_values{1};
     c = tmp(1:nvars);
-    a_vec = tmp(nvars+1:2*nvars);
+    A_vec = tmp(nvars+1:2*nvars);
     b = tmp(2*nvars+1:end);
 
     % compose a matrix from a vector
-    a = reshape(a_vec, [n,m])';
+    a = vector_to_matrix(m, n, A_vec);
 
     % define parameters used in sub_grad algorithm
     epsilon = 0.1;
@@ -40,7 +40,11 @@ function subgradient()
     disp('Objective function value:')
     disp(theta_pi_k)
     disp('x:')
-    disp( reshape(x_k(1:m*n), m,n)' )
+    disp(vector_to_matrix(m, n, x_k(1:m*n)))
+    disp('----------------------------------')
+    disp('Clean up to get integer solutions:')
+    disp('x:')
+    disp(sol_cleanup_ps(m, n, x_k(1:m*n), A_vec, c));
 end
 
 
@@ -72,7 +76,7 @@ function [x_k, theta_pi_k] = sub_grad( epsilon, ro, pi_zero, iterLimit, DualNoCh
         if gamma_k == 0
             break;
         else
-            theta_chap = applymyHeuristic(x_k, a,b,c);
+            theta_chap = applyMyHeuristic(x_k, a,b,c);
             if (isempty(theta_chap))
                 break;
             end
@@ -90,13 +94,7 @@ end
 function [X, FVAL] = solve_lagrangien_relaxation(pi_k,a,b,c)
 
     [m,n] = size(a);
-    x_length = m*n + m * m * n;
     nvars = m*n * (1+m);
-
-    % add zeros for no-cost z variables
-    %c = [c;zeros(m*n*m,1)];
-    
-    nvars = m*n * (1+m); % (x_11,...,x_mn,z_11^1,...,z_1n^1,...,z_n1^m,z_nm^m)
 
     % compose A matrix (for constraints (11) + (13) + (14) + (15))
     A = zeros(m*m + 3*m*m*n, nvars);
@@ -112,14 +110,12 @@ function [X, FVAL] = solve_lagrangien_relaxation(pi_k,a,b,c)
             for j = 1:n
                 if j ~= k
                     A(row, (i-1)*n + j) = a(i,j);
-                    A(row, m*n + (i-1)*m*n + k + (j-1)*m) = -a(i,j);
+                    A(row, m*n + (i-1)*(m*n) + (k-1)*m + j) = -a(i,j);
                 end
             end
             row = row + 1;
         end
     end
-    A(1:row,:)
-    return;
     % complete A matrix (constraints (13))
     A(row:row + m*m*n - 1, m*n+1:end) = eye(m*m*n);
     pattern = zeros(m*n, n);
@@ -170,6 +166,7 @@ function [X, FVAL] = solve_lagrangien_relaxation(pi_k,a,b,c)
 
     % compose B matrix (for constraints (11) + (13) + (14) + (15))
     B = [zeros(size(A,1) - m*m*n,1);ones(m*m*n,1)];
+    B(1:m*m) = repelem(b,m,1);
 
     % compose Aeq matrix (for constraint (4) on column sum)
     Aeq = zeros(n, nvars);
@@ -179,68 +176,67 @@ function [X, FVAL] = solve_lagrangien_relaxation(pi_k,a,b,c)
     lb = zeros(nvars, 1);
     ub = [ones(m*n, 1);Inf*ones(nvars - m*n, 1)];
 
-% Aeq = [repmat( eye(n), 1, m) zeros(n, x_length - m*n)];
-% Beq = ones(n,1);
-% 
-% LB = zeros(x_length,1);
-% UB = ones(x_length,1);
+    nvars = m*n;
+    A0 = zeros(m, nvars);
+    for i = 1:m
+        for j = 1:n
+            A0(i, (i-1)*n+j) = a(i,j);
+        end
+    end
+    X0 = [sol_initial(m,n,c,matrix_to_vector(a),b,A0,Aeq(:,1:nvars),beq);zeros(m*m*n,1)];
 
-%X0 = zeros(x_length,1);
-X0 = [sol_initial(m,n,c,matrix_to_vector(a),b,A,Aeq,beq);zeros(m*m*n,1)];
-
-opts = optimoptions('fmincon', 'Display', 'iter');
-[ X, FVAL ] = fmincon( @(x)L_10(x,pi_k,a,b,c), X0, A,B, Aeq, beq, lb, ub, [], opts);
-
+    opts = optimoptions('fmincon', 'Display', 'iter');
+    [X, FVAL] = fmincon(@(x)L_10(x,pi_k,a,b,c), X0, A,B, Aeq, beq, lb, ub);
 end
 
-function theta_chap = applymyHeuristic(x_0,a,b,c)
-[m,n] = size(a);
+function theta_chap = applyMyHeuristic(x_0,a,b,c)
+    [m,n] = size(a);
 
-A = zeros(m, m*n);
-j = 1;
-for i=1:m
-    A(i, (j-1)*n+1:j*n ) = a(i,:);
-    j = j + 1;
-end
+    A = zeros(m, m*n);
+    j = 1;
+    for i=1:m
+        A(i, (j-1)*n+1:j*n ) = a(i,:);
+        j = j + 1;
+    end
 
-Aeq = repmat( eye(n), 1, m);
-Beq = ones(n,1);
+    Aeq = repmat(eye(n), 1, m);
+    Beq = ones(n,1);
 
-LB = zeros(m*n, 1);
-UB = ones(m*n, 1);
+    LB = zeros(m*n, 1);
+    UB = ones(m*n, 1);
 
-f = @(x) obj_func(m, n, x, c);
+    f = @(x) obj_func(m, n, x, c);
 
-opts = optimoptions('patternsearch', 'PollMethod', 'GSSPositiveBasisNp1', 'UseCompletePoll', true, 'ScaleMesh', false, 'MeshTolerance', 0.99);
+    opts = optimoptions('patternsearch', 'PollMethod', 'GSSPositiveBasisNp1', 'UseCompletePoll', true, 'ScaleMesh', false, 'MeshTolerance', 0.99);
 
-%[~,theta_chap] = intlinprog(c, 1:m*n, A,b, Aeq, Beq, LB, UB, x_0(1:m*n));
-[~,theta_chap] = patternsearch(f, x_0(1:m*n), A,b, Aeq, Beq, LB, UB, [], opts);
+    [~,theta_chap] = patternsearch(f, x_0(1:m*n), A,b, Aeq, Beq, LB, UB, [], opts);
 
 end
 
 function L = L_10(x, pi, a, b, c)
-% define the Lagrangien relaxation with constraint (10)
-[m,n] = size(a);
-c = [c;zeros(m*n*m,1)];
+    % define the Lagrangien relaxation with constraint (10)
+    [m,n] = size(a);
+    c = [c;zeros(m*n*m,1)];
 
-g = g_10(x,a,b);
-
-L = sum(c.*x) + sum(pi .* g);
-
+    g = g_10(x,a,b);
+    
+    L = sum(c.*x) + sum(pi.*g);
 end
 
 function g = g_10(x, a, b)
-% define g vector containing all constraints represented by (10)
-[m,n] = size(a);
-
-g = zeros(m*m,1);
-z_variables = m*n + 1;
-
-for i = 1:m
-    for k=1:m
-        g((i-1)*m+k) = sum( a(i,:)' .* x( z_variables: z_variables + n - 1) ) - (b(i) - a(i,k))*x((i-1) *m + k);
-        z_variables = z_variables + n;
+    [m,n] = size(a);
+    
+    A = zeros(m*m, length(x));
+    row = 1;
+    for i = 1:m
+        for k = 1:m
+            A(row, (i-1)*n + k) = -(b(i) - a(i,k));
+            for j = 1:n
+                A(row, m*n + (i-1)*(m*n) + (k-1)*m + j) = a(i,j);
+            end
+            row = row + 1;
+        end
     end
-end
-
+    
+    g = A * x;
 end
