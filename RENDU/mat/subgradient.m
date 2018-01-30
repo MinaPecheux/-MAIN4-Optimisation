@@ -1,12 +1,12 @@
 % [MAIN4 - Optimisation continue]
 % Cours de H. Ouzia
-% Projet : Affectation optimale d'agents à des tâches
+% Projet : Affectation optimale d'agents Ã  des tÃ¢ches
 % ========
 % 
-% A. Khizar, R. Kanyamibwa, M. Pêcheux, C. Voisembert
+% A. Khizar, R. Kanyamibwa, M. PÃªcheux, C. Voisembert
 % ---------------------------------------------------
 % Script utilisant l'algorithme du sous-gradient pour
-% résoudre le problème (P).
+% rÃ©soudre le problÃ¨me (P).
 % ---------------------------------------------------
 
 function subgradient()
@@ -117,6 +117,21 @@ function [X, FVAL] = solve_lagrangien_relaxation(pi_k,a,b,c)
         row = floor(i / m) + 1;
     end
     row = row + m;
+    
+    % start A matrix (constraints (10))
+    %row = 1;
+    %col_z = m*n + 1;
+    %k = 0;
+    %for i = 1:m*m
+        %A(i, (row-1)*n + 1 + k) = -b(row) + a(row, k+1);
+        %A(i, col_z:col_z+n-1) = a(row,:);
+
+        %k = mod(k+1, m);
+        %col_z = col_z + n;
+        %row = floor(i / m) + 1;
+    %end
+    %row = row + m;
+    
     % complete A matrix (constraints (13))
     A(row:row + m*m*n - 1, m*n+1:end) = eye(m*m*n);
     pattern = zeros(m*n, n);
@@ -224,6 +239,16 @@ function L = L_10(x, pi, a, b, c)
     L = sum(c.*x) + sum(pi.*g);
 end
 
+function L = L_11(x, pi, a, b, c)
+    % define the Lagrangien relaxation with constraint (11)
+    [m,n] = size(a);
+    c = [c;zeros(m*n*m,1)];
+
+    g = g_11(x,a,b);
+    
+    L = sum(c.*x) + sum(pi.*g);
+end
+
 function g = g_10(x, a, b)
     [m,n] = size(a);
     
@@ -240,5 +265,26 @@ function g = g_10(x, a, b)
         row = floor(i / m) + 1;
     end
     
+    g = A * x;
+end
+
+function g = g_11(x, a, b)
+    [m,n] = size(a);
+    
+    A = zeros(m*m, length(x));
+    row = 1;
+    col_z = m*n + 1;
+    k = 0;
+    for i = 1:m*m
+        A(i, (row-1)*n+1:n*row) = a(row,:);
+        A(i, (row-1)*n + 1 + k) = b(row);
+        A(i, col_z:col_z+n-1) = -a(row,:);
+        A(i, k + col_z) = 0;
+
+        k = mod(k+1, m);
+        col_z = col_z + n;
+        row = floor(i / m) + 1;
+    end
+        
     g = A * x;
 end
