@@ -15,6 +15,10 @@
 %
 % Chaque cas est dans une section différente qui peut
 % être évaluée de manière autonome.
+%
+% ATTENTION ! Les résolutions du problème (L) sont
+% relativement longues (~1h30) même pour la plus
+% petite instance a05100.
 % ---------------------------------------------------
 
 function metaheuristics()
@@ -123,44 +127,24 @@ function metaheuristics()
     lb = zeros(nvars, 1);
     ub = [ones(m*n, 1);Inf*ones(nvars - m*n, 1)];
     
-    % solve problem
-% en utilisant GA
-    opts = optimoptions('ga', 'InitialPopulation', x0', 'Display', 'iter');
-    disp('GENETIC ALGORITHM: Starting (L) resolution...');
+    % solve (L) problem with patternsearch
+    opts = optimoptions('patternsearch', 'PollMethod', 'GSSPositiveBasisNp1', 'UseCompletePoll', true, 'Display', 'iter');
+    disp('PATTERNSEARCH: Starting (L) resolution...');
     tic
-    [x_ga, obj_ga] = ga(f, nvars, A, B, Aeq, beq, lb, ub, [], [], opts);
+    [x_ps, obj_ps] = patternsearch(f, x0, A, B, Aeq, beq, lb, ub, [], opts);
     tps_l = toc;
 
     % display results
-    disp_x_ga = vector_to_matrix(m, n, x_ga(1:m*n));
-    disp_z_ga = vector_to_matrix(m*m, n, x_ga(m*n+1:end));
+    disp_x_ps = vector_to_matrix(m, n, x_ps(1:m*n));
+    disp_z_ps = vector_to_matrix(m*m, n, x_ps(m*n+1:end));
 
-    disp('GENETIC ALGORITHM');
+    disp('PATTERNSEARCH');
     disp(['Solved (L): ',num2str(tps_l),' sec']);
     disp('Solution x =')
-    disp(disp_x_ga);
+    disp(disp_x_ps);
     disp('Solution z =')
-    disp(disp_z_ga);
-    disp(['Objective value (min): ', num2str(obj_ga)]);
-    
-% en utilisant PATTERNSEARCH
-%     opts = optimoptions('patternsearch', 'PollMethod', 'GSSPositiveBasisNp1', 'UseCompletePoll', true, 'Display', 'iter');
-%     disp('PATTERNSEARCH: Starting (L) resolution...');
-%     tic
-%     [x_ps, obj_ps] = patternsearch(f, x0, A, B, Aeq, beq, lb, ub, [], opts);
-%     tps_l = toc;
-% 
-%     % display results
-%     disp_x_ps = vector_to_matrix(m, n, x_ps(1:m*n));
-%     disp_z_ps = vector_to_matrix(m*m, n, x_ps(m*n+1:end));
-% 
-%     disp('PATTERNSEARCH');
-%     disp(['Solved (L): ',num2str(tps_l),' sec']);
-%     disp('Solution x =')
-%     disp(disp_x_ps);
-%     disp('Solution z =')
-%     disp(disp_z_ps);
-%     disp(['Objective value (min): ', num2str(obj_ps)]);
+    disp(disp_z_ps);
+    disp(['Objective value (min): ', num2str(obj_ps)]);
 
     % re-solve (P) problem
     % --------------------
@@ -184,7 +168,6 @@ function metaheuristics()
     beq = ones(n, 1);
 
     x0 = sol_cleanup_ps(m, n, x_ps(1:m*n), A_vec, c);
-    %x0 = sol_cleanup_ga(m, n, x_ga(1:m*n), A_vec, c);
     disp(['x0 feasible? Feasibility: ',num2str(sol_check(x0, A_vec, b))])
     run_problem(m, n, matrix_to_vector(x0), c, A, b, Aeq, beq, A_vec, false);
 
