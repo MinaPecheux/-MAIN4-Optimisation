@@ -10,7 +10,7 @@
 % -----------------------------------------------------------
 function subgradient()
     % load data
-    f = fopen('../dat/1/a0203', 'r');
+    f = fopen('../dat/1/a05100', 'r');
     r_dimensions = textscan(f, '%f', 2);
     r_values = textscan(f, '%f');
     fclose(f);
@@ -32,14 +32,26 @@ function subgradient()
     ro = 1;
     pi_zero = zeros(m*m,1);
     iterLimit = 100;
-    DualNoChangTOL = 2;
+    DualNoChangeTOL = 2;
 
-    [x_k, theta_pi_k] = sub_grad( epsilon, ro, pi_zero, iterLimit, DualNoChangTOL,a,b,c);
-
+    tic;
+    [x_k, theta_pi_k] = sub_grad( epsilon, ro, pi_zero, iterLimit, DualNoChangeTOL,a,b,c);
+    tps = toc;
+    
     disp('Objective function value:')
     disp(theta_pi_k)
+    disp(['Time: ', num2str(tps), ' sec'])
     disp('x:')
-    disp( reshape(x_k(1:m*n), m,n)' )
+    disp(vector_to_matrix(m, n, x_k(1:m*n)))
+    disp(['Feasibility: ', num2str(sol_check(vector_to_matrix(m, n, x_k(1:m*n)), a_vec, b))])
+    disp('-------------------------------')
+    disp('Cleanup to get integer solution')
+    x_k_int = sol_cleanup_ps(m, n, x_k(1:m*n), a_vec, b, c);
+    disp('Objective function value:')
+    disp(sum(c.*matrix_to_vector(x_k_int)))
+    disp('x:')
+    disp(x_k_int)
+    disp(['Feasibility: ', num2str(sol_check(x_k_int, a_vec, b))])
 end
 
 % -----------------------------------------------------------
@@ -50,13 +62,13 @@ end
 % - ro [réel] : 2e paramètre de précision
 % - pi_zero [vecteur de réels] : vecteur pi initial
 % - iterLimit [entier] : nombre d'itérations maximal
-% - DualNoChangTOL [entier] : nombre d'itérations tolérées
+% - DualNoChangeTOL [entier] : nombre d'itérations tolérées
 % . sans changement de la valeur de la fonction duale 
 % - a [matrice de réels] : matrice de productivité
 % - b [vecteur de réels] : vecteur des disponibilités
 % - c [vecteur de réels] : vecteur des coûts
 % -----------------------------------------------------------
-function [x_k, theta_pi_k] = sub_grad(epsilon, ro, pi_zero, iterLimit, DualNoChangTOL, a, b, c)
+function [x_k, theta_pi_k] = sub_grad(epsilon, ro, pi_zero, iterLimit, DualNoChangeTOL, a, b, c)
     [m,~] = size(a);
 
     k = 1;
@@ -73,7 +85,7 @@ function [x_k, theta_pi_k] = sub_grad(epsilon, ro, pi_zero, iterLimit, DualNoCha
         if theta_pi_k > beta_k
             beta_k = theta_pi_k;
         else
-           if t < DualNoChangTOL
+           if t < DualNoChangeTOL
                t = t + 1;
            else
                ro = ro / 2;
@@ -112,23 +124,37 @@ function [X, FVAL] = solve_lagrangien_relaxation(pi_k, a, b, c)
     [m,n] = size(a);
     x_length = m*n + m * m * n;
 
-    % Compose A_11 matrix for constraints (11) 
-    A_11 = zeros(m*m, x_length);
-    row_a = 1;
-    z_variables = m*n + 1;
+    % start A matrix (constraints (10))
+    A_10 = zeros(m*m, x_length);
+    row = 1;
+    col_z = m*n + 1;
     k = 0;
     for i = 1:m*m
+        A_10(i, (row-1)*n + 1 + k) = -b(row) + a(row, k+1);
+        A_10(i, col_z:col_z+n-1) = a(row,:);
 
-        A_11(i, (row_a-1)*n+1:n*row_a) = a(row_a,:);
-        A_11(i,(row_a-1)*n+1 + k) = b(row_a);
-
-        A_11(i, z_variables:z_variables+n-1) = - a(row_a,:);
-        A_11(i, k+z_variables) = 0;
-
-        k = mod( k+1, m );
-        z_variables = z_variables + n;
-        row_a = floor( i / m ) + 1;
+        k = mod(k+1, m);
+        col_z = col_z + n;
+        row = floor(i / m) + 1;
     end
+
+    % Compose A_11 matrix for constraints (11) 
+%     A_11 = zeros(m*m, x_length);
+%     row_a = 1;
+%     z_variables = m*n + 1;
+%     k = 0;
+%     for i = 1:m*m
+% 
+%         A_11(i, (row_a-1)*n+1:n*row_a) = a(row_a,:);
+%         A_11(i,(row_a-1)*n+1 + k) = b(row_a);
+% 
+%         A_11(i, z_variables:z_variables+n-1) = - a(row_a,:);
+%         A_11(i, k+z_variables) = 0;
+% 
+%         k = mod( k+1, m );
+%         z_variables = z_variables + n;
+%         row_a = floor( i / m ) + 1;
+%     end
 
     % Compose A_13 matrix for constraints (13) 
     A_13 = zeros( m*m*n ,x_length);
@@ -163,10 +189,13 @@ function [X, FVAL] = solve_lagrangien_relaxation(pi_k, a, b, c)
         j = (i-1)/m;
         A_15( i: i + m*n -1, j+1: j+n ) = pattern;
     end
+    % remove overlapping (doubled) constraints
+    A = [A_10; A_13; A_14; A_15];
+    A = unique(A, 'stable', 'rows');
 
-    % compose A matrix containing all constraints
-    A = [A_11; A_13; A_14; A_15];
-    B = [repelem(b,m,1); zeros(m*m*n,1); zeros(m*m*n,1); ones(m*m*n,1)];
+    % compose B matrix (for constraints (11) + (13) + (14) + (15))
+    B = [zeros(size(A,1) - m*m*n,1);ones(m*m*n,1)];
+%    B(1:m*m) = repelem(b,m,1);
 
     Aeq = [repmat( eye(n), 1, m) zeros(n, x_length - m*n)];
     Beq = ones(n,1);
@@ -183,9 +212,8 @@ function [X, FVAL] = solve_lagrangien_relaxation(pi_k, a, b, c)
     end
     X0 = [sol_initial(m,n,c,matrix_to_vector(a),b,A0,Aeq(:,1:nvars),Beq);zeros(m*m*n,1)];
 
-    opts = optimoptions('patternsearch', 'PollMethod', 'GPSPositiveBasisNp1', 'UseCompletePoll', true, 'Display', 'iter', 'TolBind', 1);
-    [ X, FVAL ] = patternsearch( @(x)L_10(x,pi_k,a,b,c), X0, A,B, Aeq, Beq, LB, UB, [], opts);
-    %[ X, FVAL ] = fmincon( @(x)L_10(x,pi_k,a,b,c), X0, A,B, Aeq, Beq, LB, UB);
+    opts = optimoptions('fmincon', 'MaxFunctionEvaluations', 5000);
+    [ X, FVAL ] = fmincon( @(x)L_11(x,pi_k,a,b,c), X0, A,B, Aeq, Beq, LB, UB, [], opts);
 end
 
 % -----------------------------------------------------------
@@ -217,7 +245,6 @@ function theta_chap = applymyHeuristic(x_0, a, b, c)
 
     opts = optimoptions('patternsearch', 'PollMethod', 'GSSPositiveBasisNp1', 'UseCompletePoll', true, 'ScaleMesh', false, 'MeshTolerance', 0.99);
 
-    %[~,theta_chap] = intlinprog(c, 1:m*n, A,b, Aeq, Beq, LB, UB, x_0(1:m*n));
     [~,theta_chap] = patternsearch(f, x_0(1:m*n), A,b, Aeq, Beq, LB, UB, [], opts);
 end
 
@@ -264,4 +291,55 @@ function g = g_10(x, a, b)
             z_variables = z_variables + n;
         end
     end
+end
+
+% -----------------------------------------------------------
+% Fonction objectif contenant les contraintes (11) dualisées.
+% Input(s):
+% - x [vecteur de réels] : point où calculer la valeur
+% . objectif
+% - pi [vecteur de réels] : multiplicateur de Lagrange
+% . courant
+% - a [matrice de réels] : matrice de productivité
+% - b [vecteur de réels] : vecteur des disponibilités
+% - c [vecteur de réels] : vecteur des coûts
+% -----------------------------------------------------------
+function L = L_11(x, pi, a, b, c)
+    % define the Lagrangien relaxation with constraint (11)
+    [m,n] = size(a);
+    c = [c;zeros(m*n*m,1)];
+
+    g = g_11(x,a,b);
+    
+    L = sum(c.*x) + sum(pi.*g);
+end
+
+% -----------------------------------------------------------
+% Fonction renvoyant la valeur des fonctions dualisées avec
+% les contraintes (11) au point donné.
+% Input(s):
+% - x [vecteur de réels] : point où calculer la valeur
+% . objectif
+% - a [matrice de réels] : matrice de productivité
+% - b [vecteur de réels] : vecteur des disponibilités
+% -----------------------------------------------------------
+function g = g_11(x, a, b)
+    [m,n] = size(a);
+    
+    A = zeros(m*m, length(x));
+    row = 1;
+    col_z = m*n + 1;
+    k = 0;
+    for i = 1:m*m
+        A(i, (row-1)*n+1:n*row) = a(row,:);
+        A(i, (row-1)*n + 1 + k) = b(row);
+        A(i, col_z:col_z+n-1) = -a(row,:);
+        A(i, k + col_z) = 0;
+
+        k = mod(k+1, m);
+        col_z = col_z + n;
+        row = floor(i / m) + 1;
+    end
+        
+    g = A * x;
 end

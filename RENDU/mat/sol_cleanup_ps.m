@@ -13,14 +13,16 @@
 % - dirty_x [vecteur de réels] : solution trouvée pour (P)
 % . par patternsearch (à nettoyer)
 % - A_vec [vecteur de réels] : vecteur de productivité
+% - b [vecteur de réels] : vecteur des disponibilités
 % - c [vecteur de réels] : vecteur des coûts
 % -----------------------------------------------------------
-function x = sol_cleanup_ps(m, n, dirty_x, A_vec, c)
+function x = sol_cleanup_ps(m, n, dirty_x, A_vec, b, c)
     % get A and c as matrix
     A_mat = vector_to_matrix(m, n, A_vec);
     c_mat = vector_to_matrix(m, n, c);
     % compute ratio matrix
     ratios = -c_mat./A_mat;
+    checked_ratios = zeros(m, n);
     
     % new x is only zero, except for 1 coeff at the max efficacity pos
     x = zeros(m, n);
@@ -39,9 +41,42 @@ function x = sol_cleanup_ps(m, n, dirty_x, A_vec, c)
             % apply 1 coeff to x vector at the pos corresponding to r min
             % value
             x(ind, j) = 1;
+            checked_ratios(ind, j) = 1;
         % else just copy the column
         else
             x(:,j) = dirty_x_mat(:,j);
+        end
+    end
+    
+    tol = 1e-2;
+    % check weight constraints (3)
+    for i = 1:m
+        if sum(A_mat(i,:).*x(i,:)) - tol > b(i)
+            % get non-zero values in row
+            row_nonzeros_ind = find(x(i,:));
+            for k = row_nonzeros_ind
+                % get matching ratio column
+                r = ratios(:, k);
+                % get matching ratio check
+                check_r = checked_ratios(:, k);
+                % get first non-checked min index
+                ind = find(r == min(r(check_r ~= 1)), 1, 'first');
+                % check for new solution feasibility on found row
+                new_row = x(ind,:);
+                new_row(k) = 1;
+                if sum(A_mat(ind,:).*new_row) - tol <= b(ind)
+                    % apply 1 coeff to x vector at the pos corresponding to r min
+                    % value
+                    x(i, k) = 0;
+                    x(ind, k) = 1;
+                    checked_ratios(ind, k) = 1;
+                
+                    % check for new solution feasibility on checked row
+                    if sum(A_mat(i,:).*x(i,:)) - tol <= b(i)
+                        break;
+                    end
+                end
+            end
         end
     end
 end

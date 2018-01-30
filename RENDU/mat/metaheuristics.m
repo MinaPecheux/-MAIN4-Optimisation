@@ -26,7 +26,7 @@ function metaheuristics()
     % --------------------------
     
     % load file data + get initial feasible solution
-    [m, n, A_vec, A, b, c, Aeq, beq, x0] = read_problem('../dat/2/b05100');
+    [m, n, A_vec, A, b, c, Aeq, beq, x0] = read_problem('../dat/1/a20100');
     % solve problem directly with patternsearch, ga, intlinprog
     %   -> option 'true' at the end to display solutions (turn to
     %   'false' to only get objective value, feasibility and exec time)
@@ -167,7 +167,7 @@ function metaheuristics()
     Aeq = repmat(eye(n), 1, m);
     beq = ones(n, 1);
 
-    x0 = sol_cleanup_ps(m, n, x_ps(1:m*n), A_vec, c);
+    x0 = sol_cleanup_ps(m, n, x_ps(1:m*n), A_vec, b, c);
     disp(['x0 feasible? Feasibility: ',num2str(sol_check(x0, A_vec, b))])
     run_problem(m, n, matrix_to_vector(x0), c, A, b, Aeq, beq, A_vec, false);
 
@@ -304,7 +304,7 @@ function metaheuristics()
     Aeq = repmat(eye(n), 1, m);
     beq = ones(n, 1);
 
-    x0 = sol_cleanup_ps(m, n, x_ps(1:m*n), A_vec, c);
+    x0 = sol_cleanup_ps(m, n, x_ps(1:m*n), A_vec, b, c);
     disp(['x0 feasible? Feasibility: ',num2str(sol_check(x0, A_vec, b))])
     run_problem(m, n, matrix_to_vector(x0), c, A, b, Aeq, beq, A_vec, false);
 end
@@ -363,9 +363,9 @@ function run_problem(m, n, x0, c, A, b, Aeq, beq, A_vec, show_solutions)
 
     % clean and display results
     % -------------------------
-    disp_x_ps = sol_cleanup_ps(m, n, x_ps, A_vec, c);
+    disp_x_ps = sol_cleanup_ps(m, n, x_ps, A_vec, b, c);
     obj_ps = obj_func(m, n, matrix_to_vector(disp_x_ps), c);
-    disp_x_ga = sol_cleanup_ga(m, n, x_ga, A_vec, c);
+    disp_x_ga = sol_cleanup_ga(m, n, x_ga, A_vec, b, c);
     obj_ga = obj_func(m, n, matrix_to_vector(disp_x_ga), c);
     disp_x_int = vector_to_matrix(m, n, x_intlinprog);
 

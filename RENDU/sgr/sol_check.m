@@ -5,12 +5,10 @@
 % 
 % A. Khizar, R. Kanyamibwa, M. Pêcheux, C. Voisembert
 % -----------------------------------------------------------
-% Fonction lisant les données d'un fichier d'instance fourni
-% pour en extraire les matrices et les vecteurs du problème
-% (P). Elle retourne également une solution initiale x0
-% réalisable.
+% Fonction vérifiant la réalisabilité d'une solution donnée
+% pour le problème lu.
 % Input(s):
-% - x [vecteur de réels] : solution à vérifier
+% - x [matrice de réels] : solution à vérifier
 % - A_vec [vecteur de réels] : vecteur de productivité
 % - b [vecteur de réels] : sous-vecteur des disponibilités
 % . correspondant aux contraintes d'inégalité
@@ -20,7 +18,7 @@ function ok = sol_check(x, A_vec, b)
     ok = 1;
     [m, n] = size(x);
     A = vector_to_matrix(m, n, A_vec);
-    tol = 1e-3;
+    tol = 1e-2;
     % check weight constraints (3)
     for i = 1:m
         if sum(A(i,:).*x(i,:)) - tol > b(i)
