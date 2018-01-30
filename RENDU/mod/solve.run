@@ -1,0 +1,125 @@
+#---
+# (c) Hacene Ouzia, UPMC 2016
+#-------------------------------
+
+reset;
+
+#---- Options
+
+option solver cplex;
+#option xpress_options "maxtime=7200";
+
+#----Output filename
+param OUTPUTFILE symbolic;
+let OUTPUTFILE := 'logsampl.txt';
+
+#---- Instances
+param nbrInstances := 1;
+
+set Instances default {};
+let Instances := {"data-1/1/a0404"};
+# OTHER FILES CANNOT BE SOLVED WITH DEMO VERSION: too much data!
+
+#---- For logs
+param Nrows {1 .. nbrInstances};
+param Ncols {1 .. nbrInstances};
+
+param POpt {1 .. nbrInstances};
+param PTime {1 .. nbrInstances};
+param MOpt {1 .. nbrInstances};
+param MTime {1 .. nbrInstances};
+param LOpt {1 .. nbrInstances};
+param LTime {1 .. nbrInstances};
+
+param NumInstance integer default 0;
+
+#---- Log headings
+printf "# Experience : Resolution (P) et (L) \n" >> (OUTPUTFILE);
+printf "# Solver     : Cplex \n" >> (OUTPUTFILE);
+printf "# Maxtime    : 2 heures \n\n" >> (OUTPUTFILE);
+
+printf "#   %4s %4s %12s %12s %12s %12s \n", 'M', 'N', 'P_OPT', 'P_TIME', 'L_OPT','L_TIME' >> (OUTPUTFILE);
+
+#---- Defining models
+model models.mod;
+problem P: x, agents_capacities, tasks_to_agents, Objective;
+problem Mprob: x, agents_capacities_M, cap_M, tasks_to_agents, Objective;
+problem L: x, z, agents_capacities_lin, tasks_to_agents, cap_lin, lin_const1, lin_const2, lin_const3, Objective;
+
+#---- Solving problems
+for{file in Instances}{
+
+   let NumInstance := NumInstance + 1;
+
+   if NumInstance > 1 then reset data M, N, c, a, b;
+
+   #------
+   # Read data from .txt file
+   #-------------------------
+   read M, N < (file);
+   for {i in I}{
+   	read {j in J} (c[i,j]) < (file);
+   }
+   for {i in I}{
+   	read {j in J} (a[i,j]) < (file);
+   }
+   read {i in I} (b[i]) < (file);
+
+   let Nrows[NumInstance] := M;
+   let Ncols[NumInstance] := N;
+
+   #------
+   # Solve the primary problem (P)
+   #------------------------------
+   solve P; printf "(P) problem solved ... \n\n";
+	for{i in I} {
+		for{j in J} {
+			printf '%.2f\t', x[i,j];
+		}
+		printf "\n";
+	}
+   printf "\n";
+
+   let    POpt[NumInstance] := Objective.val;
+   let   PTime[NumInstance] := _solve_time;
+
+   reset data x;
+
+   #------
+   # Solve the auxiliary problem (M)
+   #------------------------------
+   solve Mprob; printf "(M) problem solved ... \n\n";
+	for{i in I} {
+		for{j in J} {
+			printf '%.2f\t', x[i,j];
+		}
+		printf "\n";
+	}
+   printf "\n";
+
+   let    MOpt[NumInstance] := Objective.val;
+   let   MTime[NumInstance] := _solve_time;
+
+   reset data x;
+
+   #------
+   # Solve the linearized problem (L)
+   #---------------------------------
+
+   # CANNOT BE SOLVED WITH DEMO VERSION: too much data!
+   solve L; printf "(L) problem solved ... \n\n";
+	for{i in I} {
+		for{j in J} {
+			printf '%.2f\t', x[i,j];
+		}
+		printf "\n";
+	}
+   printf "\n";
+
+   let    LOpt[NumInstance] := Objective.val;
+   let   LTime[NumInstance] := _solve_time;
+   #-- Logs ...
+   printf "    %4d %4d %12.3f %12.3f %12.3f %12.3f \n", Nrows[NumInstance], Ncols[NumInstance], POpt[NumInstance], PTime[NumInstance], LOpt[NumInstance],LTime[NumInstance] >> (OUTPUTFILE);
+}
+
+printf "\n" >> (OUTPUTFILE);
