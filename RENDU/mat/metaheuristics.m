@@ -26,7 +26,7 @@ function metaheuristics()
     % --------------------------
     
     % load file data + get initial feasible solution
-    [m, n, A_vec, A, b, c, Aeq, beq, x0] = read_problem('../dat/1/a0202');
+    [m, n, A_vec, A, b, c, Aeq, beq, x0] = read_problem('../dat/2/b05100');
     % solve problem directly with patternsearch, ga, intlinprog
     %   -> option 'true' at the end to display solutions (turn to
     %   'false' to only get objective value, feasibility and exec time)
@@ -372,6 +372,10 @@ function run_problem(m, n, x0, c, A, b, Aeq, beq, A_vec, show_solutions)
     disp(['PATTERN SEARCH - Objective value (min): ', num2str(obj_ps)]);
     disp(['Time: ', num2str(t_ps), ' sec']);
     disp(['Feasible (after cleanup): ', num2str(sol_check(disp_x_ps, A_vec, b))]);
+    if obj_ps ~= 0
+        disp(['Solution quality: ', num2str(100*(obj_ps - obj_intlinprog)/obj_ps)]);
+        disp(['> Solver efficiency (100/[quality * exec time]): ', num2str(100/(t_ps * 100*(obj_ps - obj_intlinprog)/obj_ps))]);
+    end
     if show_solutions
         disp('Solution x =');
         disp(disp_x_ps);
@@ -380,6 +384,10 @@ function run_problem(m, n, x0, c, A, b, Aeq, beq, A_vec, show_solutions)
     disp([newline, 'GENETIC ALGORITHM - Objective value (min): ', num2str(obj_ga)]);
     disp(['Time: ', num2str(t_ga), ' sec']);
     disp(['Feasible (after cleanup): ', num2str(sol_check(disp_x_ga, A_vec, b))]);
+    if obj_ga ~= 0
+        disp(['Solution quality: ', num2str(100*(obj_ga - obj_intlinprog)/obj_ga)]);
+        disp(['> Solver efficiency (100/[quality * exec time]): ', num2str(100/(t_ga * 100*(obj_ga - obj_intlinprog)/obj_ga))]);
+    end
     if show_solutions
         disp('Solution x =')
         disp(disp_x_ga);

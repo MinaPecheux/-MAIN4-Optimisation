@@ -37,16 +37,20 @@ function x = sol_cleanup_ga(m, n, dirty_x, A_vec, c)
         if isempty(col_nonzeros_ind)
             % get matching ratio columns at non-zero values indexes
             r = ratios(col_nonzeros_ind, j);
+            % get first min index
+            ind = find(r == min(r), 1, 'first');
             % apply 1 coeff to x vector at the pos corresponding to r max
             % value
-            x(r == max(r), j) = 1;
+            x(ind, j) = 1;
         % if there are more than one, clean it
         elseif length(col_nonzeros_ind) > 1
             % get matching ratio columns at non-zero values indexes
             r = ratios(col_nonzeros_ind, j);
+            % get first min index
+            ind = find(r == min(r), 1, 'first');
             % apply 1 coeff to x vector at the pos corresponding to r max
             % value
-            x(col_nonzeros_ind(r == max(r)), j) = 1;
+            x(col_nonzeros_ind(ind), j) = 1;
         % else just copy the column
         else
             x(:,j) = dirty_x_mat(:,j);
